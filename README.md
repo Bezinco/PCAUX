@@ -1,2 +1,2 @@
 # PCAUX
-Pokemon Card Project
+Gem Auction project
