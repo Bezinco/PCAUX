@@ -70,9 +70,21 @@ export default async function handler(req, res) {
       return await pcuBrick(req, res);
     }
 
-    // === BRICK 12: DEMO MARKET ===
-    if (url.startsWith('/api/demo')) {
-      return await demoBrick(req, res);
+   // === BRICK 12: DEMO MARKET ===
+if (url.startsWith('/api/demo')) {
+  if (url === '/api/demo/players' || url === '/demo/players') {
+    const { getDemoPlayers } = await import('./src/bricks/brick-12-demo-market-hardened.js');
+    return await getDemoPlayers(req, res);
+  }
+
+  if (url === '/api/demo/status' || url === '/demo/status') {
+    const { getDemoStatus } = await import('./src/bricks/brick-12-demo-market-hardened.js');
+    return await getDemoStatus(req, res);
+  }
+
+  // Fallback for other /demo endpoints
+  return res.status(404).json({ error: 'Demo endpoint not found' });
+}
     }
 
     // === HEALTH CHECK (direct) ===
