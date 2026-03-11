@@ -1,1 +1,5 @@
-
+{
+  "type": "module",
+  "name": "pcaux-api",
+  "version": "1.0.0"
+}
