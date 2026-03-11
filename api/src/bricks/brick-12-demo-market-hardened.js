@@ -754,5 +754,43 @@ router.get('/demo/activity/by-metadata', async (req, res) => {
     activities: rows
   });
 });
+// ============================================
+// EXPORTED HANDLERS FOR VERCEL
+// ============================================
 
-export default router;
+export async function getDemoPlayers(req, res) {
+  try {
+    return res.status(200).json({
+      players: [
+        { name: 'WhaleWatcher', personality: 'whale', aggression: 0.7 },
+        { name: 'DiamondHands', personality: 'trader', aggression: 0.9 },
+        { name: 'QuickFlip', personality: 'scalper', aggression: 0.85 },
+        { name: 'GemGatherer', personality: 'collector', aggression: 0.3 }
+      ]
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+export async function getDemoStatus(req, res) {
+  try {
+    return res.status(200).json({
+      demo_mode: true,
+      active_players: 4,
+      volume_24h: '125,000 PCU',
+      active_gems: 12
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+// ============================================
+// EXPRESS ROUTES
+// ============================================
+router.get('/players', (req, res) => getDemoPlayers(req, res));
+router.get('/status', (req, res) => getDemoStatus(req, res));
+
+export default router;  // ← THIS STAYS AT THE VERY BOTTOM
+
