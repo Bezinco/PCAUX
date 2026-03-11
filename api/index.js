@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   const url = req.url;
   const method = req.method;
 
-  // CORS headers (so frontend can talk to API)
+  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -70,24 +70,22 @@ export default async function handler(req, res) {
       return await pcuBrick(req, res);
     }
 
-   // === BRICK 12: DEMO MARKET ===
-if (url.startsWith('/api/demo')) {
-  if (url === '/api/demo/players' || url === '/demo/players') {
-    const { getDemoPlayers } = await import('./src/bricks/brick-12-demo-market-hardened.js');
-    return await getDemoPlayers(req, res);
-  }
+    // === BRICK 12: DEMO MARKET ===
+    if (url.startsWith('/api/demo')) {
+      if (url === '/api/demo/players' || url === '/demo/players') {
+        const { getDemoPlayers } = await import('./src/bricks/brick-12-demo-market-hardened.js');
+        return await getDemoPlayers(req, res);
+      }
 
-  if (url === '/api/demo/status' || url === '/demo/status') {
-    const { getDemoStatus } = await import('./src/bricks/brick-12-demo-market-hardened.js');
-    return await getDemoStatus(req, res);
-  }
+      if (url === '/api/demo/status' || url === '/demo/status') {
+        const { getDemoStatus } = await import('./src/bricks/brick-12-demo-market-hardened.js');
+        return await getDemoStatus(req, res);
+      }
 
-  // Fallback for other /demo endpoints
-  return res.status(404).json({ error: 'Demo endpoint not found' });
-}
+      return res.status(404).json({ error: 'Demo endpoint not found' });
     }
 
-    // === HEALTH CHECK (direct) ===
+    // === HEALTH CHECK ===
     if (url === '/api/health' || url === '/health') {
       return res.status(200).json({
         status: 'alive',
@@ -102,6 +100,8 @@ if (url.startsWith('/api/demo')) {
   } catch (error) {
     console.error('API Error:', error);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+}
   }
 }
 }
