@@ -1,59 +1,95 @@
-export default function handler(req, res) {
+// === IMPORT ALL BRICKS ===
+import authBrick from './src/bricks/brick-01-auth.js';
+import sleeveBrick from './src/bricks/brick-02-sleeve.js';
+import ipoBrick from './src/bricks/brick-03-ipo.js';
+import tradingBrick from './src/bricks/brick-04-trading.js';
+import gradingBrick from './src/bricks/brick-05-grading.js';
+import settlementBrick from './src/bricks/brick-06-settlement.js';
+import qualityKingBrick from './src/bricks/brick-07-quality-king.js';
+import adminBrick from './src/bricks/brick-08-admin.js';
+import pcuBrick from './src/bricks/brick-11-pcu-crypto.js';
+import demoBrick from './src/bricks/brick-12-demo-market-hardened.js';
+
+// === MASTER HANDLER ===
+export default async function handler(req, res) {
   const url = req.url;
+  const method = req.method;
 
-  // === HEALTH CHECK ===
-  if (url === '/api/health' || url === '/health') {
-    return res.status(200).json({ 
-      status: 'alive', 
-      timestamp: new Date().toISOString() 
-    });
+  // CORS headers (so frontend can talk to API)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (method === 'OPTIONS') {
+    return res.status(200).end();
   }
 
-  // === DEMO PLAYERS ===
-  if (url === '/api/demo/players' || url === '/demo/players') {
-    return res.status(200).json({
-      players: [
-        { name: 'WhaleWatcher', personality: 'whale' },
-        { name: 'DiamondHands', personality: 'trader' },
-        { name: 'QuickFlip', personality: 'scalper' },
-        { name: 'GemGatherer', personality: 'collector' }
-      ]
-    });
-  }
+  try {
+    // === BRICK 1: AUTH ===
+    if (url.startsWith('/api/auth')) {
+      return await authBrick(req, res);
+    }
 
-  // === DEMO STATUS ===
-  if (url === '/api/demo/status' || url === '/demo/status') {
-    return res.status(200).json({
-      demo_mode: true,
-      active_players: 4,
-      volume_24h: '125,000 PCU',
-      active_gems: 12
-    });
-  }
+    // === BRICK 2: SLEEVE ===
+    if (url.startsWith('/api/sleeve') || url.startsWith('/api/diamonds')) {
+      return await sleeveBrick(req, res);
+    }
 
-  // === QUALITY KINGS ===
-  if (url === '/api/quality-kings' || url === '/quality-kings') {
-    return res.status(200).json({
-      jewelers: [
-        { name: 'Raj Gems', tier: 'gold', score: 750 },
-        { name: 'Maya Precious', tier: 'platinum', score: 1200 }
-      ]
-    });
-  }
+    // === BRICK 3: IPO ===
+    if (url.startsWith('/api/ipo')) {
+      return await ipoBrick(req, res);
+    }
 
-  // === PCU BALANCES ===
-  if (url === '/api/pcu/balances' || url === '/pcu/balances') {
-    return res.status(200).json({
-      balances: [
-        { address: '0x123...', balance: 5000 },
-        { address: '0x456...', balance: 12500 }
-      ]
-    });
-  }
+    // === BRICK 4: TRADING ===
+    if (url.startsWith('/api/trading') || url.startsWith('/api/orders')) {
+      return await tradingBrick(req, res);
+    }
 
-  // === NOT FOUND ===
-  return res.status(404).json({ 
-    error: 'Not found', 
-    requested: url 
-  });
+    // === BRICK 5: GRADING ===
+    if (url.startsWith('/api/grading')) {
+      return await gradingBrick(req, res);
+    }
+
+    // === BRICK 6: SETTLEMENT ===
+    if (url.startsWith('/api/settlement') || url.startsWith('/api/redeem')) {
+      return await settlementBrick(req, res);
+    }
+
+    // === BRICK 7: QUALITY KING ===
+    if (url.startsWith('/api/quality-king') || url.startsWith('/api/leaderboard')) {
+      return await qualityKingBrick(req, res);
+    }
+
+    // === BRICK 8: ADMIN ===
+    if (url.startsWith('/api/admin')) {
+      return await adminBrick(req, res);
+    }
+
+    // === BRICK 11: PCU CRYPTO ===
+    if (url.startsWith('/api/pcu')) {
+      return await pcuBrick(req, res);
+    }
+
+    // === BRICK 12: DEMO MARKET ===
+    if (url.startsWith('/api/demo')) {
+      return await demoBrick(req, res);
+    }
+
+    // === HEALTH CHECK (direct) ===
+    if (url === '/api/health' || url === '/health') {
+      return res.status(200).json({
+        status: 'alive',
+        timestamp: new Date().toISOString(),
+        bricks: '12 bricks ready'
+      });
+    }
+
+    // === 404 ===
+    return res.status(404).json({ error: 'Endpoint not found' });
+
+  } catch (error) {
+    console.error('API Error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
 }
