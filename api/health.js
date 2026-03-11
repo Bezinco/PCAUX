@@ -1,4 +1,6 @@
 export default function handler(req, res) {
+  console.log('Request received:', req.url);
+  
   const url = req.url;
   
   // Health check
@@ -22,5 +24,5 @@ export default function handler(req, res) {
   }
   
   // 404 for everything else
-  return res.status(404).json({ error: 'Not found' });
+  return res.status(404).json({ error: 'Not found', requested: url });
 }
