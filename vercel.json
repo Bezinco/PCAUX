@@ -17,11 +17,6 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/api/src/[...path]"
-    }
-  ]
-}
-      "src": "/api/(.*)",
       "dest": "/api/src/[...path]?path=$1"
     }
   ]
