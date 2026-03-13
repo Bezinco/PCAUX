@@ -1,4 +1,4 @@
-// api/[...path].js
+// api/src/[...path].js
 // PCAUX Diamond Platform - Catch-all handler for Vercel serverless
 
 import { Pool } from 'pg';
@@ -12,8 +12,8 @@ if (process.env.DATABASE_URL) {
 }
 
 export default async function handler(req, res) {
-  const pathSegments = req.query.path || [];
-  const path = pathSegments.join('/');
+  // === UPDATED PATH HANDLING ===
+  const path = req.query.path || '';
   const fullPath = `/api/${path}`;
   const method = req.method;
   
@@ -90,7 +90,7 @@ export default async function handler(req, res) {
 }
 
 // === HANDLER FUNCTIONS ===
-
+// (These remain exactly the same as before)
 async function handleSupabaseTest(req, res) {
   try {
     const { createClient } = await import('@supabase/supabase-js');
@@ -108,7 +108,6 @@ async function handleSupabaseTest(req, res) {
     
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     
-    // Test connection by getting server time or health check
     const { data, error } = await supabase.from('players').select('count', { count: 'exact', head: true });
     
     if (error) {
@@ -122,7 +121,7 @@ async function handleSupabaseTest(req, res) {
     return res.status(200).json({
       connected: true,
       timestamp: new Date().toISOString(),
-      supabaseUrl: supabaseUrl.replace(/\/\/[^@]+@/, '//[hidden]@'), // Hide credentials
+      supabaseUrl: supabaseUrl.replace(/\/\/[^@]+@/, '//[hidden]@'),
       tables: ['players'],
       testQuery: 'success'
     });
@@ -142,7 +141,6 @@ async function handleDemoPlayers(req, res) {
   
   try {
     if (method === 'GET') {
-      // Return mock player data
       const players = [
         {
           id: 'p1',
@@ -187,7 +185,6 @@ async function handleDemoPlayers(req, res) {
     }
     
     if (method === 'POST') {
-      // Create new player (mock)
       const newPlayer = {
         id: `p${Date.now()}`,
         ...req.body,
@@ -213,7 +210,6 @@ async function handleDemoPlayers(req, res) {
 
 async function handleDemoStatus(req, res) {
   try {
-    // Simulate platform status metrics
     const status = {
       platform: 'PCAUX Diamond',
       version: '1.0.0-demo',
