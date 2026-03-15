@@ -1,392 +1,294 @@
-// brick-02-sleeve.js
-// PCAux Diamond Platform - Brick #2: Sleeve Verification & Image Capture
-// Hardware integration for tamper-evident stone verification and 7-image packet generation
+// archive/bricks/brick-01-auth.js
+// PCAux Diamond Platform - Brick #1: Auth & Jeweler Onboarding (Vercel/Supabase)
 
-import express from 'express';
-import { Pool } from 'pg';
-import { body, validationResult } from 'express-validator';
-import multer from 'multer';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { v4 as uuidv4 } from 'uuid';
-import sharp from 'sharp';
-import { requireJeweler } from './brick-01-auth.js';
+import { createClient } from '@supabase/supabase-js';
 
-const router = express.Router();
-const pool = new Pool();
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
-// S3 config for image storage
-const s3 = new S3Client({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-  }
-});
+const JWT_EXPIRY = '8h';
 
-const BUCKET = process.env.S3_BUCKET || 'pcaux-images';
+// ===== USER REGISTRATION =====
 
-// Multer config (memory storage, process then upload to S3)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Only images allowed'), false);
-  }
-});
-
-// ===== SLEEVE HARDWARE MANAGEMENT =====
-
-// Register new sleeve device (admin only)
-router.post('/sleeves/register', async (req, res) => {
-  const { sleeve_id, location, assigned_to } = req.body;
-  
-  try {
-    const { rows: [sleeve] } = await pool.query(`
-      INSERT INTO sleeves (id, status, location, assigned_to, created_at)
-      VALUES ($1, 'active', $2, $3, NOW())
-      RETURNING *
-    `, [sleeve_id, location, assigned_to]);
-    
-    res.status(201).json(sleeve);
-  } catch (err) {
-    res.status(500).json({ error: 'Sleeve registration failed' });
-  }
-});
-
-// Get sleeve status
-router.get('/sleeves/:sleeveId', requireJeweler, async (req, res) => {
-  const { sleeveId } = req.params;
-  
-  try {
-    const { rows: [sleeve] } = await pool.query(`
-      SELECT s.*, j.business_name as assigned_jeweler
-      FROM sleeves s
-      LEFT JOIN jewelers j ON s.assigned_to = j.id
-      WHERE s.id = $1
-    `, [sleeveId]);
-    
-    if (!sleeve) return res.status(404).json({ error: 'Sleeve not found' });
-    res.json(sleeve);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to load sleeve' });
-  }
-});
-
-// ===== DIAMOND INTAKE & VERIFICATION =====
-
-// Step 1: Initialize diamond listing (jeweler creates draft)
-router.post('/diamonds/draft', requireJeweler, [
-  body('estimated_carat').isFloat({ min: 0.1, max: 10 }),
-  body('estimated_color').isIn(['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'unknown']),
-  body('estimated_clarity').isIn(['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1', 'I2', 'I3', 'unknown']),
-  body('estimated_cut').isIn(['Ideal', 'Excellent', 'Very Good', 'Good', 'Fair', 'Poor', 'unknown']),
-  body('shape').isIn(['Round', 'Princess', 'Emerald', 'Asscher', 'Cushion', 'Oval', 'Pear', 'Marquise', 'Radiant', 'Heart']),
-  body('origin_story').optional().trim()
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
-  const {
-    estimated_carat,
-    estimated_color,
-    estimated_clarity,
-    estimated_cut,
-    shape,
-    origin_story,
-    fluorescence,
-    symmetry,
-    polish
-  } = req.body;
-
-  const client = await pool.connect();
+export async function register(req, res) {
+  const { email, password, display_name } = req.body;
 
   try {
-    await client.query('BEGIN');
+    // Check existing
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
 
-    // Create diamond draft
-    const { rows: [diamond] } = await client.query(`
-      INSERT INTO diamonds (
-        jeweler_id, status,
-        estimated_carat, estimated_color, estimated_clarity, estimated_cut,
-        shape, origin_story, fluorescence, symmetry, polish,
-        created_at
-      ) VALUES ($1, 'draft', $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
-      RETURNING id
-    `, [
-      req.jeweler.id, estimated_carat, estimated_color, estimated_clarity,
-      estimated_cut, shape, origin_story || null, fluorescence || 'unknown',
-      symmetry || 'unknown', polish || 'unknown'
-    ]);
+    if (existing) {
+      return res.status(409).json({ error: 'Registration failed' });
+    }
 
-    await client.query('COMMIT');
+    // Create auth user
+    const { data: authUser, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
 
-    res.status(201).json({
-      diamond_id: diamond.id,
-      status: 'draft',
-      message: 'Draft created. Proceed to sleeve verification.'
+    if (authError) throw authError;
+
+    // Create user profile
+    const { data: user, error: profileError } = await supabase
+      .from('users')
+      .insert({
+        id: authUser.user.id,
+        email,
+        display_name,
+        role: 'speculator',
+        status: 'active',
+        created_at: new Date().toISOString(),
+        kyc_status: 'pending',
+        email_verified: false
+      })
+      .select()
+      .single();
+
+    if (profileError) throw profileError;
+
+    // Create verification token
+    const verifyToken = crypto.randomUUID();
+    await supabase.from('email_verifications').insert({
+      user_id: user.id,
+      token_hash: verifyToken,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      created_at: new Date().toISOString()
+    });
+
+    return res.status(201).json({
+      user: { id: user.id, email: user.email, display_name: user.display_name, role: user.role },
+      requires_email_verification: true
     });
 
   } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('Draft creation error:', err);
-    res.status(500).json({ error: 'Failed to create draft' });
-  } finally {
-    client.release();
+    console.error('Registration error:', err);
+    return res.status(500).json({ error: 'Registration failed' });
   }
-});
+}
 
-// Step 2: Daughter verifies stone and seals sleeve
-router.post('/diamonds/:diamondId/verify', requireJeweler, upload.fields([
-  { name: 'loupe_view', maxCount: 1 },        // 10x inclusion mapping
-  { name: 'face_up_white', maxCount: 1 },      // Brilliance, contrast
-  { name: 'face_up_color', maxCount: 1 },       // Fire, scintillation
-  { name: 'profile_60deg', maxCount: 1 },      // Girdle, culet
-  { name: 'uv_fluorescence', maxCount: 1 },     // Blue/yellow intensity
-  { name: 'spectroscopy', maxCount: 1 },       // Plot or reference
-  { name: 'scale_weight', maxCount: 1 }        // Carat confirmation
-]), async (req, res) => {
-  const { diamondId } = req.params;
-  const { sleeve_id, daughter_id, verification_notes } = req.body;
+// ===== USER LOGIN =====
 
-  if (!req.files || Object.keys(req.files).length < 7) {
-    return res.status(400).json({ error: 'All 7 images required' });
-  }
-
-  const client = await pool.connect();
+export async function login(req, res) {
+  const { email, password, mfa_token } = req.body;
 
   try {
-    await client.query('BEGIN');
+    // Sign in with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    // Verify diamond belongs to this jeweler and is in draft
-    const { rows: [diamond] } = await client.query(`
-      SELECT * FROM diamonds WHERE id = $1 AND jeweler_id = $2 AND status = 'draft'
-    `, [diamondId, req.jeweler.id]);
-
-    if (!diamond) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Diamond not found or not in draft status' });
+    if (authError) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Verify sleeve is active and assigned to this jeweler
-    const { rows: [sleeve] } = await client.query(`
-      SELECT * FROM sleeves WHERE id = $1 AND assigned_to = $2 AND status = 'active'
-    `, [sleeve_id, req.jeweler.id]);
+    // Get user profile
+    const { data: user } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
 
-    if (!sleeve) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'Invalid or unauthorized sleeve' });
+    if (!user || user.status !== 'active') {
+      return res.status(401).json({ error: 'Account inactive' });
     }
 
-    // Process and upload images to S3
-    const imageUrls = {};
-    const imageKeys = ['loupe_view', 'face_up_white', 'face_up_color', 'profile_60deg', 'uv_fluorescence', 'spectroscopy', 'scale_weight'];
-
-    for (const key of imageKeys) {
-      const file = req.files[key]?.[0];
-      if (!file) continue;
-
-      // Process image (resize, watermark, optimize)
-      const processed = await sharp(file.buffer)
-        .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 90, progressive: true })
-        .toBuffer();
-
-      // Generate unique key
-      const s3Key = `diamonds/${diamondId}/${key}_${uuidv4()}.jpg`;
-
-      // Upload to S3
-      await s3.send(new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: s3Key,
-        Body: processed,
-        ContentType: 'image/jpeg',
-        Metadata: {
-          'diamond-id': diamondId,
-          'image-type': key,
-          'sleeve-id': sleeve_id,
-          'daughter-id': daughter_id
-        }
-      }));
-
-      // Construct URL (CloudFront or direct S3)
-      imageUrls[key] = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+    // Check MFA if enabled
+    if (user.mfa_enabled && !mfa_token) {
+      return res.json({ 
+        requires_mfa: true,
+        mfa_token: crypto.randomUUID()
+      });
     }
 
-    // Calculate tamper-evident hash (simplified)
-    const sealHash = require('crypto')
-      .createHash('sha256')
-      .update(`${diamondId}${sleeve_id}${Date.now()}${JSON.stringify(imageUrls)}`)
-      .digest('hex');
+    // Update last login
+    await supabase
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id);
 
-    // Create verification record
-    await client.query(`
-      INSERT INTO sleeve_verifications (
-        diamond_id, sleeve_id, daughter_id, verification_notes,
-        seal_hash, images, verified_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
-    `, [
-      diamondId, sleeve_id, daughter_id, verification_notes || null,
-      sealHash, JSON.stringify(imageUrls)
-    ]);
+    // Create session
+    const { data: session } = await supabase
+      .from('user_sessions')
+      .insert({
+        user_id: user.id,
+        token_jti: authData.session.access_token,
+        ip_address: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+        user_agent: req.headers['user-agent'],
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      })
+      .select()
+      .single();
 
-    // Update diamond status and images
-    await client.query(`
-      UPDATE diamonds 
-      SET status = 'verified',
-          sleeve_id = $2,
-          seal_hash = $3,
-          images = $4,
-          verified_at = NOW(),
-          updated_at = NOW()
-      WHERE id = $1
-    `, [diamondId, sleeve_id, sealHash, JSON.stringify(imageUrls)]);
-
-    // Mark sleeve as sealed (until IPO completes or stone removed)
-    await client.query(`
-      UPDATE sleeves 
-      SET current_diamond_id = $1, status = 'sealed', sealed_at = NOW()
-      WHERE id = $2
-    `, [diamondId, sleeve_id]);
-
-    await client.query('COMMIT');
-
-    res.json({
-      diamond_id: diamondId,
-      status: 'verified',
-      seal_hash: sealHash,
-      images: imageUrls,
-      message: 'Stone verified and sealed. Ready for IPO.'
+    return res.json({
+      token: authData.session.access_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        display_name: user.display_name,
+        role: user.role,
+        kyc_status: user.kyc_status,
+        quality_king_tier: user.quality_king_tier || 'novice',
+        email_verified: user.email_verified,
+        mfa_enabled: user.mfa_enabled
+      }
     });
 
   } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('Verification error:', err);
-    res.status(500).json({ error: 'Verification failed' });
-  } finally {
-    client.release();
+    console.error('Login error:', err);
+    return res.status(500).json({ error: 'Login failed' });
   }
-});
+}
 
-// Get diamond with images (for IPO preview)
-router.get('/diamonds/:diamondId', async (req, res) => {
-  const { diamondId } = req.params;
+// ===== EMAIL VERIFICATION =====
+
+export async function verifyEmail(req, res) {
+  const { token } = req.query;
 
   try {
-    const { rows: [diamond] } = await pool.query(`
-      SELECT 
-        d.*,
-        j.business_name as jeweler_name,
-        j.quality_king_tier as jeweler_tier,
-        j.quality_king_score as jeweler_score,
-        sv.daughter_id,
-        sv.verified_at as sleeve_verified_at
-      FROM diamonds d
-      JOIN jewelers j ON d.jeweler_id = j.id
-      LEFT JOIN sleeve_verifications sv ON d.id = sv.diamond_id
-      WHERE d.id = $1 AND d.status IN ('verified', 'listing', 'grading', 'graded', 'resolved')
-    `, [diamondId]);
+    const { data: verification } = await supabase
+      .from('email_verifications')
+      .select('*, users!inner(email)')
+      .eq('token_hash', token)
+      .gt('expires_at', new Date().toISOString())
+      .is('verified_at', null)
+      .single();
 
-    if (!diamond) return res.status(404).json({ error: 'Diamond not found' });
-
-    // Parse images
-    if (diamond.images) {
-      diamond.images = JSON.parse(diamond.images);
+    if (!verification) {
+      return res.status(400).json({ error: 'Invalid or expired token' });
     }
 
-    res.json(diamond);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to load diamond' });
-  }
-});
+    // Update user
+    await supabase
+      .from('users')
+      .update({ email_verified: true, updated_at: new Date().toISOString() })
+      .eq('id', verification.user_id);
 
-// List verified diamonds available for IPO
-router.get('/diamonds', async (req, res) => {
-  const { status = 'verified', jeweler_id, limit = 20, offset = 0 } = req.query;
+    // Mark verification complete
+    await supabase
+      .from('email_verifications')
+      .update({ verified_at: new Date().toISOString() })
+      .eq('id', verification.id);
+
+    return res.json({ message: 'Email verified successfully' });
+
+  } catch (err) {
+    return res.status(500).json({ error: 'Verification failed' });
+  }
+}
+
+// ===== LOGOUT =====
+
+export async function logout(req, res) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token' });
+  }
+
+  const token = auth.split(' ')[1];
 
   try {
-    let where = 'WHERE d.status = $1';
-    const params = [status];
+    await supabase
+      .from('user_sessions')
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('token_jti', token);
 
-    if (jeweler_id) {
-      where += ` AND d.jeweler_id = $${params.length + 1}`;
-      params.push(jeweler_id);
-    }
+    return res.json({ message: 'Logged out successfully' });
 
-    const { rows } = await pool.query(`
-      SELECT 
-        d.id, d.estimated_carat, d.estimated_color, d.estimated_clarity,
-        d.estimated_cut, d.shape, d.status, d.verified_at, d.created_at,
-        j.business_name as jeweler_name,
-        j.quality_king_tier as jeweler_tier,
-        (SELECT ipo_price FROM ipos WHERE diamond_id = d.id AND status = 'open' LIMIT 1) as ipo_price,
-        (SELECT total_pcus FROM ipos WHERE diamond_id = d.id AND status = 'open' LIMIT 1) as total_pcus
-      FROM diamonds d
-      JOIN jewelers j ON d.jeweler_id = j.id
-      ${where}
-      ORDER BY d.verified_at DESC
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-    `, [...params, limit, offset]);
-
-    res.json({ diamonds: rows, limit, offset });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to load diamonds' });
+    return res.status(500).json({ error: 'Logout failed' });
   }
-});
+}
 
-// Release sleeve (after redemption or withdrawal)
-router.post('/diamonds/:diamondId/release', requireJeweler, async (req, res) => {
-  const { diamondId } = req.params;
-  const { release_reason } = req.body; // 'ipo_cancelled', 'redemption_complete', 'withdrawal'
+// ===== MIDDLEWARE HELPERS =====
 
-  const client = await pool.connect();
+export async function requireAuth(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
 
   try {
-    await client.query('BEGIN');
-
-    // Verify ownership and status
-    const { rows: [diamond] } = await client.query(`
-      SELECT * FROM diamonds WHERE id = $1 AND jeweler_id = $2
-    `, [diamondId, req.jeweler.id]);
-
-    if (!diamond) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Diamond not found' });
+    const token = auth.split(' ')[1];
+    
+    // Verify with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    if (!diamond.sleeve_id) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Diamond not in sleeve' });
+    // Check session
+    const { data: session } = await supabase
+      .from('user_sessions')
+      .select('*')
+      .eq('token_jti', token)
+      .gt('expires_at', new Date().toISOString())
+      .is('revoked_at', null)
+      .single();
+
+    if (!session) {
+      return res.status(401).json({ error: 'Session expired or revoked' });
     }
 
-    // Log release
-    await client.query(`
-      INSERT INTO sleeve_releases (diamond_id, sleeve_id, jeweler_id, release_reason, released_at)
-      VALUES ($1, $2, $3, $4, NOW())
-    `, [diamondId, diamond.sleeve_id, req.jeweler.id, release_reason]);
+    // Get full user profile
+    const { data: profile } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
 
-    // Free the sleeve
-    await client.query(`
-      UPDATE sleeves 
-      SET status = 'active', current_diamond_id = NULL, sealed_at = NULL
-      WHERE id = $1
-    `, [diamond.sleeve_id]);
-
-    // Update diamond (if withdrawal, mark withdrawn)
-    if (release_reason === 'withdrawal') {
-      await client.query(`UPDATE diamonds SET status = 'withdrawn' WHERE id = $1`, [diamondId]);
-    }
-
-    await client.query('COMMIT');
-
-    res.json({ message: 'Sleeve released', diamond_id: diamondId });
+    req.user = profile;
+    req.tokenJti = token;
+    next();
 
   } catch (err) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: 'Release failed' });
-  } finally {
-    client.release();
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
-});
+}
 
-export default router;
+export async function requireJeweler(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token' });
+  }
+
+  try {
+    const token = auth.split(' ')[1];
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Get jeweler profile
+    const { data: jeweler } = await supabase
+      .from('jewelers')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (!jeweler || jeweler.status !== 'active') {
+      return res.status(401).json({ error: 'Jeweler account inactive' });
+    }
+
+    if (jeweler.kyb_status !== 'verified') {
+      return res.status(403).json({ error: 'KYB verification required' });
+    }
+
+    req.jeweler = jeweler;
+    req.tokenJti = token;
+    next();
+
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
