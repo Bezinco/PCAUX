@@ -6,7 +6,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "api/path.js",
+      "src": "api/[path].js",
       "use": "@vercel/node"
     }
   ],
@@ -17,7 +17,7 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/api/path"
+      "dest": "/api/[path]?path=$1"
     }
   ]
 }
