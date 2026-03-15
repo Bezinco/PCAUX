@@ -10,10 +10,9 @@ if (process.env.DATABASE_URL) {
 }
 
 export default async function handler(req, res) {
-  // Parse path from URL instead of query param
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const path = url.pathname.replace('/api/', '') || '';
-  const fullPath = url.pathname;
+  // Simple path parsing - no URL constructor
+  const fullPath = req.url || '';
+  const path = fullPath.replace(/^\/api\//, '').split('?')[0] || '';
   const method = req.method;
 
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -52,6 +51,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('API Error:', error);
-    return res.status(500).json({ error: 'Internal error' });
+    return res.status(500).json({ error: 'Internal error', message: error.message });
   }
 }
