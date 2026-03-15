@@ -1,41 +1,18 @@
-// brick-05-grading.js
-// PCAux Diamond Platform - Brick #5: Grading Pipeline (CGL/GIA)
-// API integration, result oracle, grade reveal, multiplier application
-// Enhanced with: grading dashboard, timeline estimates, confidence intervals, insurance claims
+// archive/bricks/brick-05-grading.js
+// PCAux Diamond Platform - Brick #5: Grading Pipeline (Vercel/Supabase)
 
-import express from 'express';
-import { Pool } from 'pg';
-import { body, validationResult } from 'express-validator';
-import { requireJeweler, requireAuth } from './brick-01-auth.js';
-import axios from 'axios';
+import { createClient } from '@supabase/supabase-js';
 
-const router = express.Router();
-const pool = new Pool();
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
-// Grader API configurations
-const CGL_API = {
-  baseUrl: process.env.CGL_API_URL || 'https://api.cgl.org/v1',
-  key: process.env.CGL_API_KEY
-};
-
-const GIA_API = {
-  baseUrl: process.env.GIA_API_URL || 'https://api.gia.edu/v1',
-  key: process.env.GIA_API_KEY
-};
-
-// Grading timeline estimates (days)
 const GRADING_TIMES = {
   standard: { CGL: 14, GIA: 21 },
   rush: { CGL: 5, GIA: 7 }
 };
 
-// Grading costs
-const GRADING_COST_CGL = 150;
-const GRADING_COST_GIA = 250;
-const RUSH_FEE = 100;
-const SHIPPING_INSURANCE = 25;
-
-// Multiplier matrix
 const GRADE_MULTIPLIERS = {
   color: {
     'D': { 'D': 1.0, 'E': 0.85, 'F': 0.75, 'G': 0.65, 'H': 0.55, 'I': 0.45, 'J': 0.35 },
@@ -67,249 +44,214 @@ const GRADE_MULTIPLIERS = {
   }
 };
 
-// ===== GRADING DASHBOARD (v1.1) =====
+// ===== GRADING DASHBOARD =====
 
-// Jeweler grading queue
-router.get('/jeweler/grading-queue', requireJeweler, async (req, res) => {
+export async function getGradingQueue(req, res) {
   const { status = 'all' } = req.query;
 
-  let where = 'WHERE d.jeweler_id = $1';
-  const params = [req.jeweler.id];
-
-  if (status !== 'all') {
-    where += ` AND gs.status = $${params.length + 1}`;
-    params.push(status);
-  }
-
-  const { rows } = await pool.query(`
-    SELECT 
-      gs.id,
-      gs.diamond_id,
-      gs.grader,
-      gs.service_level,
-      gs.status,
-      gs.certificate_number,
-      gs.final_color,
-      gs.final_clarity,
-      gs.final_cut,
-      gs.final_carat,
-      d.shape,
-      d.estimated_carat,
-      d.estimated_color,
-      d.estimated_clarity,
-      d.estimated_cut,
-      gs.submitted_at,
-      gs.completed_at,
-      EXTRACT(EPOCH FROM (NOW() - gs.submitted_at))/86400 as days_ago,
-      EXTRACT(EPOCH FROM (gs.completed_at - gs.submitted_at))/86400 as days_to_complete,
-      CASE 
-        WHEN gs.service_level = 'rush' THEN ${GRADING_TIMES.rush.CGL}
-        ELSE ${GRADING_TIMES.standard.CGL}
-      END as expected_days_cgl,
-      CASE 
-        WHEN gs.service_level = 'rush' THEN ${GRADING_TIMES.rush.GIA}
-        ELSE ${GRADING_TIMES.standard.GIA}
-      END as expected_days_gia,
-      gv.total_multiplier
-    FROM grading_submissions gs
-    JOIN diamonds d ON gs.diamond_id = d.id
-    LEFT JOIN graded_valuations gv ON gs.id = gv.submission_id
-    ${where}
-    ORDER BY gs.submitted_at DESC
-  `, params);
-
-  // Add timeline status
-  rows.forEach(row => {
-    const expectedDays = row.grader === 'GIA' 
-      ? (row.service_level === 'rush' ? GRADING_TIMES.rush.GIA : GRADING_TIMES.standard.GIA)
-      : (row.service_level === 'rush' ? GRADING_TIMES.rush.CGL : GRADING_TIMES.standard.CGL);
-    
-    row.timeline_status = row.completed_at 
-      ? 'completed'
-      : row.days_ago > expectedDays * 1.5 
-        ? 'overdue' 
-        : row.days_ago > expectedDays 
-          ? 'at_risk' 
-          : 'on_track';
-    
-    row.expected_completion = row.submitted_at 
-      ? new Date(new Date(row.submitted_at).getTime() + expectedDays * 86400000).toISOString()
-      : null;
-  });
-
-  res.json({ 
-    queue: rows,
-    summary: {
-      total: rows.length,
-      pending: rows.filter(r => !r.completed_at).length,
-      completed: rows.filter(r => r.completed_at).length,
-      overdue: rows.filter(r => r.timeline_status === 'overdue').length,
-      avg_multiplier: rows.filter(r => r.total_multiplier).reduce((a, b) => a + parseFloat(b.total_multiplier), 0) / rows.filter(r => r.total_multiplier).length || null
-    }
-  });
-});
-
-// Confidence intervals for jeweler (v1.1)
-router.get('/jeweler/multiplier-confidence', requireJeweler, async (req, res) => {
-  const { rows: [stats] } = await pool.query(`
-    SELECT 
-      AVG(gv.total_multiplier) as avg_mult,
-      STDDEV(gv.total_multiplier) as stddev_mult,
-      MIN(gv.total_multiplier) as min_mult,
-      MAX(gv.total_multiplier) as max_mult,
-      COUNT(*) as sample_size,
-      PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY gv.total_multiplier) as p25,
-      PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY gv.total_multiplier) as p75
-    FROM graded_valuations gv
-    JOIN diamonds d ON gv.diamond_id = d.id
-    WHERE d.jeweler_id = $1
-    AND gv.calculated_at > NOW() - INTERVAL '90 days'
-  `, [req.jeweler.id]);
-
-  if (!stats || stats.sample_size === 0) {
-    return res.json({ 
-      message: 'Insufficient grading history for confidence interval',
-      expected_range: '1.2x - 2.0x (platform average)'
-    });
-  }
-
-  const avg = parseFloat(stats.avg_mult);
-  const stddev = parseFloat(stats.stddev_mult) || 0.3;
-
-  res.json({
-    jeweler_id: req.jeweler.id,
-    sample_size: parseInt(stats.sample_size),
-    statistics: {
-      mean: avg.toFixed(2),
-      stddev: stddev.toFixed(2),
-      min: parseFloat(stats.min_mult).toFixed(2),
-      max: parseFloat(stats.max_mult).toFixed(2),
-      p25: parseFloat(stats.p25).toFixed(2),
-      p75: parseFloat(stats.p75).toFixed(2)
-    },
-    confidence_intervals: {
-      '68%': `${(avg - stddev).toFixed(2)}x - ${(avg + stddev).toFixed(2)}x`,
-      '95%': `${(avg - 2 * stddev).toFixed(2)}x - ${(avg + 2 * stddev).toFixed(2)}x`
-    },
-    interpretation: stddev < 0.5 
-      ? 'Consistent grading results - reliable estimates'
-      : stddev < 1.0
-        ? 'Moderate variance - typical for mixed inventory'
-        : 'High variance - consider specializing in specific categories'
-  });
-});
-
-// ===== GRADING SUBMISSION =====
-
-router.post('/diamonds/:diamondId/grade', requireJeweler, [
-  body('grader').isIn(['CGL', 'GIA']),
-  body('service_level').optional().isIn(['standard', 'rush']),
-  body('origin_report').optional().isBoolean(),
-  body('insurance_value').optional().isFloat()
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
-  const { diamondId } = req.params;
-  const { grader, service_level = 'standard', origin_report = false, insurance_value } = req.body;
-
-  const client = await pool.connect();
-
   try {
-    await client.query('BEGIN');
+    let query = supabase
+      .from('grading_submissions')
+      .select(`
+        *,
+        diamonds!inner(shape, estimated_carat, estimated_color, estimated_clarity, estimated_cut),
+        graded_valuations!left(total_multiplier)
+      `)
+      .eq('diamonds.jeweler_id', req.jeweler.id)
+      .order('submitted_at', { ascending: false });
 
-    const { rows: [diamond] } = await client.query(`
-      SELECT d.*, i.ipo_price, i.total_pcus, i.sold_pcus, i.id as ipo_id
-      FROM diamonds d
-      JOIN ipos i ON d.id = i.diamond_id
-      WHERE d.id = $1 AND d.jeweler_id = $2 AND d.status IN ('listing', 'pending_grading')
-    `, [diamondId, req.jeweler.id]);
-
-    if (!diamond) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Diamond not found or not ready for grading' });
+    if (status !== 'all') {
+      query = query.eq('status', status);
     }
 
-    if (diamond.sold_pcus < diamond.total_pcus * 0.5) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'IPO must be at least 50% subscribed' });
-    }
+    const { data: submissions } = await query;
 
-    const baseCost = grader === 'GIA' ? GRADING_COST_GIA : GRADING_COST_CGL;
-    const rushFee = service_level === 'rush' ? RUSH_FEE : 0;
-    const originFee = origin_report ? 75 : 0;
-    const totalCost = baseCost + rushFee + originFee + SHIPPING_INSURANCE;
+    // Add timeline status
+    const enriched = submissions?.map(row => {
+      const expectedDays = row.grader === 'GIA' 
+        ? (row.service_level === 'rush' ? GRADING_TIMES.rush.GIA : GRADING_TIMES.standard.GIA)
+        : (row.service_level === 'rush' ? GRADING_TIMES.rush.CGL : GRADING_TIMES.standard.CGL);
+      
+      const daysAgo = (new Date() - new Date(row.submitted_at)) / (1000 * 60 * 60 * 24);
+      
+      return {
+        ...row,
+        days_ago: daysAgo,
+        expected_days: expectedDays,
+        timeline_status: row.completed_at 
+          ? 'completed'
+          : daysAgo > expectedDays * 1.5 
+            ? 'overdue' 
+            : daysAgo > expectedDays 
+              ? 'at_risk' 
+              : 'on_track',
+        expected_completion: row.submitted_at 
+          ? new Date(new Date(row.submitted_at).getTime() + expectedDays * 86400000).toISOString()
+          : null
+      };
+    });
 
-    const { rows: [treasury] } = await client.query(`
-      SELECT COALESCE(SUM(CASE WHEN status = 'locked' THEN amount ELSE 0 END), 0) as locked,
-             COALESCE(SUM(CASE WHEN event_type = 'grading_paid' THEN amount ELSE 0 END), 0) as spent
-      FROM treasury_events
-      WHERE ipo_id = $1
-    `, [diamond.ipo_id]);
-
-    const available = (treasury.locked || 0) - (treasury.spent || 0);
-    if (available < totalCost) {
-      await client.query('ROLLBACK');
-      return res.status(402).json({ required: totalCost, available });
-    }
-
-    const { rows: [submission] } = await client.query(`
-      INSERT INTO grading_submissions (
-        diamond_id, ipo_id, grader, service_level, origin_report_requested,
-        cost, status, submitted_at, expected_completion_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, 'submitted', NOW(), NOW() + INTERVAL '${service_level === 'rush' ? '7 days' : '21 days'}')
-      RETURNING *
-    `, [diamondId, diamond.ipo_id, grader, service_level, origin_report, totalCost]);
-
-    await client.query(`
-      INSERT INTO treasury_events (ipo_id, event_type, amount, status, metadata, created_at)
-      VALUES ($1, 'grading_paid', $2, 'locked', $3, NOW())
-    `, [diamond.ipo_id, totalCost, JSON.stringify({ submission_id: submission.id, grader })]);
-
-    await client.query(`
-      UPDATE diamonds SET status = 'grading', grader = $2, grading_submitted_at = NOW() WHERE id = $1
-    `, [diamondId, grader]);
-
-    await client.query(`
-      UPDATE sleeves SET status = 'shipping_to_grader', current_diamond_id = NULL WHERE id = $1
-    `, [diamond.sleeve_id]);
-
-    const insuranceAmount = insurance_value || (diamond.total_pcus * diamond.ipo_price * 0.8);
-    await client.query(`
-      INSERT INTO grading_shipments (
-        submission_id, from_sleeve, to_grader, grader_address, insurance_value, status, created_at
-      ) VALUES ($1, $2, $3, $4, $5, 'in_transit', NOW())
-    `, [
-      submission.id,
-      diamond.sleeve_id,
-      grader,
-      grader === 'GIA' ? 'GIA Laboratory, Carlsbad, CA' : 'CGL Laboratory, Mumbai, India',
-      insuranceAmount
-    ]);
-
-    await client.query('COMMIT');
-
-    res.json({
-      submission_id: submission.id,
-      grader,
-      service_level,
-      expected_days: GRADING_TIMES[service_level][grader],
-      expected_completion: submission.expected_completion_at,
-      cost: totalCost,
-      insurance_value: insuranceAmount
+    return res.json({
+      queue: enriched,
+      summary: {
+        total: enriched?.length || 0,
+        pending: enriched?.filter(r => !r.completed_at).length || 0,
+        completed: enriched?.filter(r => r.completed_at).length || 0,
+        overdue: enriched?.filter(r => r.timeline_status === 'overdue').length || 0
+      }
     });
 
   } catch (err) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: 'Submission failed' });
-  } finally {
-    client.release();
+    return res.status(500).json({ error: 'Failed to load queue' });
   }
-});
+}
 
-// ===== GRADING RESULT ORACLE =====
+export async function getMultiplierConfidence(req, res) {
+  const jewelerId = req.params.jewelerId || req.jeweler?.id;
 
-router.post('/webhooks/grading-result', async (req, res) => {
+  try {
+    const { data: stats } = await supabase
+      .from('graded_valuations')
+      .select('total_multiplier')
+      .eq('diamonds.jeweler_id', jewelerId)
+      .gt('calculated_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString());
+
+    if (!stats || stats.length === 0) {
+      return res.json({ 
+        message: 'Insufficient grading history',
+        expected_range: '1.2x - 2.0x (platform average)'
+      });
+    }
+
+    const multipliers = stats.map(s => s.total_multiplier);
+    const avg = multipliers.reduce((a, b) => a + b, 0) / multipliers.length;
+    const stddev = Math.sqrt(multipliers.reduce((sq, n) => sq + Math.pow(n - avg, 2), 0) / multipliers.length);
+
+    return res.json({
+      jeweler_id: jewelerId,
+      sample_size: stats.length,
+      statistics: {
+        mean: avg.toFixed(2),
+        stddev: stddev.toFixed(2),
+        min: Math.min(...multipliers).toFixed(2),
+        max: Math.max(...multipliers).toFixed(2)
+      },
+      confidence_intervals: {
+        '68%': `${(avg - stddev).toFixed(2)}x - ${(avg + stddev).toFixed(2)}x`,
+        '95%': `${(avg - 2 * stddev).toFixed(2)}x - ${(avg + 2 * stddev).toFixed(2)}x`
+      }
+    });
+
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to calculate confidence' });
+  }
+}
+
+// ===== GRADING SUBMISSION =====
+
+export async function submitForGrading(req, res) {
+  const { diamondId } = req.params;
+  const { grader, service_level = 'standard', origin_report = false, insurance_value } = req.body;
+
+  try {
+    // Verify diamond
+    const { data: diamond } = await supabase
+      .from('diamonds')
+      .select(`
+        *,
+        ipos!inner(ipo_price, total_pcus, sold_pcus, id as ipo_id)
+      `)
+      .eq('id', diamondId)
+      .eq('jeweler_id', req.jeweler.id)
+      .in('status', ['listing', 'pending_grading'])
+      .single();
+
+    if (!diamond) {
+      return res.status(404).json({ error: 'Diamond not found or not ready' });
+    }
+
+    if (diamond.ipos.sold_pcus < diamond.ipos.total_pcus * 0.5) {
+      return res.status(400).json({ error: 'IPO must be at least 50% subscribed' });
+    }
+
+    const baseCost = grader === 'GIA' ? 250 : 150;
+    const rushFee = service_level === 'rush' ? 100 : 0;
+    const originFee = origin_report ? 75 : 0;
+    const totalCost = baseCost + rushFee + originFee + 25;
+
+    // Check treasury
+    const { data: treasury } = await supabase
+      .from('treasury_events')
+      .select('amount, status')
+      .eq('ipo_id', diamond.ipos.ipo_id);
+
+    const locked = treasury?.filter(t => t.status === 'locked').reduce((sum, t) => sum + t.amount, 0) || 0;
+    const spent = treasury?.filter(t => t.event_type === 'grading_paid').reduce((sum, t) => sum + t.amount, 0) || 0;
+    const available = locked - spent;
+
+    if (available < totalCost) {
+      return res.status(402).json({ required: totalCost, available });
+    }
+
+    const expectedDays = service_level === 'rush' ? 7 : 21;
+
+    // Create submission
+    const { data: submission } = await supabase
+      .from('grading_submissions')
+      .insert({
+        diamond_id: diamondId,
+        ipo_id: diamond.ipos.ipo_id,
+        grader,
+        service_level,
+        origin_report_requested: origin_report,
+        cost: totalCost,
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        expected_completion_at: new Date(Date.now() + expectedDays * 24 * 60 * 60 * 1000).toISOString()
+      })
+      .select()
+      .single();
+
+    // Record treasury event
+    await supabase.from('treasury_events').insert({
+      ipo_id: diamond.ipos.ipo_id,
+      event_type: 'grading_paid',
+      amount: totalCost,
+      status: 'locked',
+      metadata: { submission_id: submission.id, grader },
+      created_at: new Date().toISOString()
+    });
+
+    // Update diamond
+    await supabase
+      .from('diamonds')
+      .update({ status: 'grading', grader, grading_submitted_at: new Date().toISOString() })
+      .eq('id', diamondId);
+
+    // Update sleeve
+    await supabase
+      .from('sleeves')
+      .update({ status: 'shipping_to_grader', current_diamond_id: null })
+      .eq('id', diamond.sleeve_id);
+
+    return res.json({
+      submission_id: submission.id,
+      grader,
+      service_level,
+      expected_days: expectedDays,
+      expected_completion: submission.expected_completion_at,
+      cost: totalCost,
+      insurance_value: insurance_value || (diamond.ipos.total_pcus * diamond.ipos.ipo_price * 0.8)
+    });
+
+  } catch (err) {
+    return res.status(500).json({ error: 'Submission failed' });
+  }
+}
+
+// ===== GRADING RESULT =====
+
+export async function recordGradingResult(req, res) {
   const {
     grader,
     submission_ref,
@@ -321,71 +263,63 @@ router.post('/webhooks/grading-result', async (req, res) => {
     }
   } = req.body;
 
-  // Verify signature in production
-  // const signature = req.headers['x-grader-signature'];
-  // if (!verifySignature(grader, req.body, signature)) return res.status(401).json({ error: 'Invalid signature' });
-
-  const client = await pool.connect();
-
   try {
-    await client.query('BEGIN');
-
-    const { rows: [submission] } = await client.query(`
-      SELECT * FROM grading_submissions WHERE id = $1 AND grader = $2
-    `, [submission_ref, grader]);
+    const { data: submission } = await supabase
+      .from('grading_submissions')
+      .select('*, diamonds!inner(*)')
+      .eq('id', submission_ref)
+      .eq('grader', grader)
+      .single();
 
     if (!submission) {
-      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Submission not found' });
     }
 
     if (submission.status === 'completed') {
-      await client.query('ROLLBACK');
       return res.status(409).json({ error: 'Result already recorded' });
     }
 
-    const { rows: [diamond] } = await pool.query(`
-      SELECT d.*, i.ipo_price, i.total_pcus, i.id as ipo_id
-      FROM diamonds d
-      JOIN ipos i ON d.id = i.diamond_id
-      WHERE d.id = $1
-    `, [submission.diamond_id]);
+    const diamond = submission.diamonds;
 
-    await client.query(`
-      UPDATE grading_submissions
-      SET status = 'completed',
-          certificate_number = $2,
-          report_url = $3,
-          final_carat = $4,
-          final_color = $5,
-          final_clarity = $6,
-          final_cut = $7,
-          final_polish = $8,
-          final_symmetry = $9,
-          final_fluorescence = $10,
-          measurements = $11,
-          proportions = $12,
-          origin = $13,
-          comments = $14,
-          completed_at = NOW()
-      WHERE id = $1
-    `, [
-      submission_ref, certificate_number, report_url,
-      carat, color, clarity, cut, polish, symmetry, fluorescence,
-      JSON.stringify(measurements), JSON.stringify(proportions), origin, comments
-    ]);
+    // Update submission
+    await supabase
+      .from('grading_submissions')
+      .update({
+        status: 'completed',
+        certificate_number,
+        report_url,
+        final_carat: carat,
+        final_color: color,
+        final_clarity: clarity,
+        final_cut: cut,
+        final_polish: polish,
+        final_symmetry: symmetry,
+        final_fluorescence: fluorescence,
+        measurements,
+        proportions,
+        origin,
+        comments,
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', submission_ref);
 
-    await client.query(`
-      UPDATE diamonds
-      SET status = 'graded',
-          final_carat = $2, final_color = $3, final_clarity = $4, final_cut = $5,
-          final_polish = $6, final_symmetry = $7, final_fluorescence = $8,
-          final_certificate_url = $9, grader = $10, graded_at = NOW()
-      WHERE id = $1
-    `, [
-      submission.diamond_id, carat, color, clarity, cut,
-      polish, symmetry, fluorescence, report_url, grader
-    ]);
+    // Update diamond
+    await supabase
+      .from('diamonds')
+      .update({
+        status: 'graded',
+        final_carat: carat,
+        final_color: color,
+        final_clarity: clarity,
+        final_cut: cut,
+        final_polish: polish,
+        final_symmetry: symmetry,
+        final_fluorescence: fluorescence,
+        final_certificate_url: report_url,
+        grader,
+        graded_at: new Date().toISOString()
+      })
+      .eq('id', submission.diamond_id);
 
     // Calculate multiplier
     const colorMult = GRADE_MULTIPLIERS.color[diamond.estimated_color || 'unknown']?.[color] || 1.0;
@@ -395,67 +329,58 @@ router.post('/webhooks/grading-result', async (req, res) => {
     const caratMult = Math.pow(caratRatio, 1.5);
 
     const totalMultiplier = colorMult * clarityMult * cutMult * caratMult;
-    const baseValue = diamond.total_pcus * diamond.ipo_price;
+    const baseValue = diamond.ipos.total_pcus * diamond.ipos.ipo_price;
     const gradedValue = baseValue * totalMultiplier;
 
-    await client.query(`
-      INSERT INTO graded_valuations (
-        diamond_id, submission_id, base_value, graded_value, total_multiplier,
-        color_mult, clarity_mult, cut_mult, carat_mult, calculated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-    `, [
-      submission.diamond_id, submission_ref, baseValue, gradedValue,
-      totalMultiplier, colorMult, clarityMult, cutMult, caratMult
-    ]);
+    // Record valuation
+    await supabase.from('graded_valuations').insert({
+      diamond_id: submission.diamond_id,
+      submission_id: submission_ref,
+      base_value: baseValue,
+      graded_value: gradedValue,
+      total_multiplier: totalMultiplier,
+      color_mult: colorMult,
+      clarity_mult: clarityMult,
+      cut_mult: cutMult,
+      carat_mult: caratMult,
+      calculated_at: new Date().toISOString()
+    });
 
     // Update jeweler score
     const gradeAccuracy = calculateAccuracy(diamond.estimated_color, color) +
                          calculateAccuracy(diamond.estimated_clarity, clarity) +
                          calculateAccuracy(diamond.estimated_cut, cut);
-    
-    await client.query(`
-      UPDATE jewelers
-      SET quality_king_score = LEAST(1000, quality_king_score + $2),
-          successful_sales = successful_sales + 1,
-          total_volume = total_volume + $3,
-          updated_at = NOW()
-      WHERE id = $1
-    `, [diamond.jeweler_id, Math.floor(gradeAccuracy * 10), gradedValue]);
 
-    await client.query(`
-      INSERT INTO post_grade_events (diamond_id, event_type, status, scheduled_at, created_at)
-      VALUES ($1, 'reveal_scheduled', 'pending', NOW() + INTERVAL '24 hours', NOW())
-    `, [submission.diamond_id]);
+    await supabase
+      .from('jewelers')
+      .update({
+        quality_king_score: Math.min(1000, (req.jeweler?.quality_king_score || 0) + Math.floor(gradeAccuracy * 10)),
+        successful_sales: (req.jeweler?.successful_sales || 0) + 1,
+        total_volume: (req.jeweler?.total_volume || 0) + gradedValue,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', diamond.jeweler_id);
 
-    await client.query('COMMIT');
+    // Schedule reveal
+    await supabase.from('post_grade_events').insert({
+      diamond_id: submission.diamond_id,
+      event_type: 'reveal_scheduled',
+      status: 'pending',
+      scheduled_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      created_at: new Date().toISOString()
+    });
 
-    // Log metrics
-    await pool.query(`
-      INSERT INTO grading_metrics (date, grader, service_level, submitted, completed, time_days, multiplier)
-      VALUES (DATE(NOW()), $1, $2, 1, 1, $3, $4)
-      ON CONFLICT (date, grader, service_level) 
-      DO UPDATE SET 
-        completed = grading_metrics.completed + 1,
-        time_days = (grading_metrics.time_days * grading_metrics.completed + $3) / (grading_metrics.completed + 1),
-        multiplier = (grading_metrics.multiplier * grading_metrics.completed + $4) / (grading_metrics.completed + 1)
-    `, [grader, submission.service_level, 
-        (new Date() - new Date(submission.submitted_at)) / 86400000, 
-        totalMultiplier]);
-
-    res.json({
+    return res.json({
       received: true,
       diamond_id: submission.diamond_id,
       total_multiplier: totalMultiplier,
-      graded_value
+      graded_value: gradedValue
     });
 
   } catch (err) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: 'Result processing failed' });
-  } finally {
-    client.release();
+    return res.status(500).json({ error: 'Result processing failed' });
   }
-});
+}
 
 function calculateAccuracy(estimated, actual) {
   if (!estimated || estimated === 'unknown') return 0.5;
@@ -480,263 +405,184 @@ function calculateAccuracy(estimated, actual) {
 
 // ===== GRADE REVEAL =====
 
-router.get('/diamonds/:diamondId/grade', async (req, res) => {
+export async function getGrade(req, res) {
   const { diamondId } = req.params;
-
-  const { rows: [result] } = await pool.query(`
-    SELECT 
-      d.final_carat, d.final_color, d.final_clarity, d.final_cut,
-      d.final_polish, d.final_symmetry, d.final_fluorescence,
-      d.final_certificate_url, d.grader, d.graded_at,
-      d.estimated_carat, d.estimated_color, d.estimated_clarity, d.estimated_cut,
-      gv.total_multiplier, gv.base_value, gv.graded_value,
-      gs.certificate_number, gs.report_url, gs.origin as final_origin,
-      gs.completed_at as graded_at,
-      j.quality_king_score as jeweler_score
-    FROM diamonds d
-    LEFT JOIN graded_valuations gv ON d.id = gv.diamond_id
-    LEFT JOIN grading_submissions gs ON d.grading_submission_id = gs.id
-    JOIN jewelers j ON d.jeweler_id = j.id
-    WHERE d.id = $1 AND d.status IN ('graded', 'resolved', 'fully_redeemed')
-  `, [diamondId]);
-
-  if (!result) return res.status(404).json({ error: 'Grade not available' });
-
-  res.json({
-    certificate: {
-      number: result.certificate_number,
-      url: result.final_certificate_url,
-      grader: result.grader,
-      date: result.graded_at
-    },
-    final_grades: {
-      carat: result.final_carat,
-      color: result.final_color,
-      clarity: result.final_clarity,
-      cut: result.final_cut,
-      polish: result.final_polish,
-      symmetry: result.final_symmetry,
-      fluorescence: result.final_fluorescence,
-      origin: result.final_origin
-    },
-    estimates: {
-      carat: result.estimated_carat,
-      color: result.estimated_color,
-      clarity: result.estimated_clarity,
-      cut: result.estimated_cut
-    },
-    valuation: {
-      base_value: result.base_value,
-      graded_value: result.graded_value,
-      total_multiplier: result.total_multiplier
-    },
-    jeweler_reliability: result.jeweler_score > 800 ? 'high' : result.jeweler_score > 500 ? 'medium' : 'developing'
-  });
-});
-
-// Manual reveal trigger
-router.post('/diamonds/:diamondId/reveal', async (req, res) => {
-  const { diamondId } = req.params;
-
-  const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    const { data: result } = await supabase
+      .from('diamonds')
+      .select(`
+        *,
+        graded_valuations!inner(*),
+        grading_submissions!left(certificate_number, report_url, origin as final_origin, completed_at as graded_at),
+        jewelers!inner(quality_king_score as jeweler_score)
+      `)
+      .eq('id', diamondId)
+      .in('status', ['graded', 'resolved', 'fully_redeemed'])
+      .single();
 
-    const { rows: [diamond] } = await client.query(`
-      SELECT * FROM diamonds WHERE id = $1 AND status = 'graded'
-    `, [diamondId]);
+    if (!result) return res.status(404).json({ error: 'Grade not available' });
+
+    return res.json({
+      certificate: {
+        number: result.grading_submissions?.certificate_number,
+        url: result.final_certificate_url,
+        grader: result.grader,
+        date: result.grading_submissions?.graded_at
+      },
+      final_grades: {
+        carat: result.final_carat,
+        color: result.final_color,
+        clarity: result.final_clarity,
+        cut: result.final_cut,
+        polish: result.final_polish,
+        symmetry: result.final_symmetry,
+        fluorescence: result.final_fluorescence,
+        origin: result.grading_submissions?.final_origin
+      },
+      estimates: {
+        carat: result.estimated_carat,
+        color: result.estimated_color,
+        clarity: result.estimated_clarity,
+        cut: result.estimated_cut
+      },
+      valuation: {
+        base_value: result.graded_valuations?.base_value,
+        graded_value: result.graded_valuations?.graded_value,
+        total_multiplier: result.graded_valuations?.total_multiplier
+      },
+      jeweler_reliability: result.jeweler_score > 800 ? 'high' : result.jeweler_score > 500 ? 'medium' : 'developing'
+    });
+
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load grade' });
+  }
+}
+
+export async function revealGrade(req, res) {
+  const { diamondId } = req.params;
+
+  try {
+    const { data: diamond } = await supabase
+      .from('diamonds')
+      .select('*')
+      .eq('id', diamondId)
+      .eq('status', 'graded')
+      .single();
 
     if (!diamond) {
-      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Not ready for reveal' });
     }
 
-    await client.query(`UPDATE diamonds SET status = 'resolved', resolved_at = NOW() WHERE id = $1`, [diamondId]);
-    await client.query(`UPDATE orders SET status = 'expired' WHERE diamond_id = $1 AND status IN ('open', 'partial')`, [diamondId]);
-    await client.query(`INSERT INTO post_grade_markets (diamond_id, status, opened_at) VALUES ($1, 'active', NOW())`, [diamondId]);
+    await supabase
+      .from('diamonds')
+      .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+      .eq('id', diamondId);
 
-    await client.query('COMMIT');
+    await supabase
+      .from('orders')
+      .update({ status: 'expired' })
+      .eq('diamond_id', diamondId)
+      .in('status', ['open', 'partial']);
 
-    res.json({ diamond_id: diamondId, status: 'resolved', message: 'Grade revealed. Post-grade trading open.' });
+    await supabase.from('post_grade_markets').insert({
+      diamond_id: diamondId,
+      status: 'active',
+      opened_at: new Date().toISOString()
+    });
+
+    return res.json({ diamond_id: diamondId, status: 'resolved', message: 'Grade revealed. Post-grade trading open.' });
 
   } catch (err) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: 'Reveal failed' });
-  } finally {
-    client.release();
+    return res.status(500).json({ error: 'Reveal failed' });
   }
-});
+}
 
-// ===== INSURANCE CLAIMS (v1.1) =====
+// ===== INSURANCE CLAIMS =====
 
-router.post('/grading/:submissionId/claim', requireJeweler, [
-  body('claim_type').isIn(['lost_shipment', 'damage', 'theft', 'grading_error']),
-  body('description').isLength({ min: 20 }),
-  body('evidence_urls').isArray()
-], async (req, res) => {
+export async function submitGradingClaim(req, res) {
   const { submissionId } = req.params;
   const { claim_type, description, evidence_urls } = req.body;
 
-  const client = await pool.connect();
-
   try {
-    const { rows: [submission] } = await client.query(`
-      SELECT gs.*, d.jeweler_id, gs.insurance_value
-      FROM grading_submissions gs
-      JOIN diamonds d ON gs.diamond_id = d.id
-      WHERE gs.id = $1
-    `, [submissionId]);
+    const { data: submission } = await supabase
+      .from('grading_submissions')
+      .select('*, diamonds!inner(jeweler_id, insurance_value)')
+      .eq('id', submissionId)
+      .single();
 
-    if (!submission || submission.jeweler_id !== req.jeweler.id) {
+    if (!submission || submission.diamonds.jeweler_id !== req.jeweler.id) {
       return res.status(404).json({ error: 'Submission not found' });
     }
 
-    const { rows: [claim] } = await client.query(`
-      INSERT INTO grading_insurance_claims (
-        submission_id, diamond_id, jeweler_id, claim_type, description, 
-        evidence_urls, claimed_amount, status, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', NOW())
-      RETURNING *
-    `, [
-      submissionId, submission.diamond_id, req.jeweler.id,
-      claim_type, description, JSON.stringify(evidence_urls),
-      submission.insurance_value || 0
-    ]);
+    const { data: claim } = await supabase
+      .from('grading_insurance_claims')
+      .insert({
+        submission_id: submissionId,
+        diamond_id: submission.diamond_id,
+        jeweler_id: req.jeweler.id,
+        claim_type,
+        description,
+        evidence_urls,
+        claimed_amount: submission.diamonds.insurance_value || 0,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
 
-    res.status(201).json({
+    return res.status(201).json({
       claim_id: claim.id,
+      claimed_amount: claim.claimed_amount,
       status: 'pending',
-      claimed_amount: submission.insurance_value,
       message: 'Claim submitted. Review within 5 business days.'
     });
 
   } catch (err) {
-    res.status(500).json({ error: 'Claim submission failed' });
-  } finally {
-    client.release();
+    return res.status(500).json({ error: 'Claim submission failed' });
   }
-});
+}
 
-// ===== MULTIPLE GRADER COMPARISON (v1.1) =====
+// ===== ADMIN QUERIES =====
 
-router.get('/diamonds/:diamondId/grader-comparison', async (req, res) => {
-  const { diamondId } = req.params;
-
-  const { rows } = await pool.query(`
-    SELECT 
-      gs.grader,
-      gs.final_color,
-      gs.final_clarity,
-      gs.final_cut,
-      gs.final_carat,
-      gv.total_multiplier,
-      gs.completed_at,
-      gs.certificate_number
-    FROM grading_submissions gs
-    LEFT JOIN graded_valuations gv ON gs.id = gv.submission_id
-    WHERE gs.diamond_id = $1 AND gs.status = 'completed'
-    ORDER BY gs.completed_at
-  `, [diamondId]);
-
-  if (rows.length < 2) {
-    return res.json({ 
-      message: 'Single grader result',
-      results: rows
-    });
-  }
-
-  // Calculate agreement
-  const agreement = {
-    color: rows.every(r => r.final_color === rows[0].final_color),
-    clarity: rows.every(r => r.final_clarity === rows[0].final_clarity),
-    cut: rows.every(r => r.final_cut === rows[0].final_cut),
-    carat: Math.max(...rows.map(r => r.final_carat)) - Math.min(...rows.map(r => r.final_carat)) < 0.01
-  };
-
-  const multiplierDiff = Math.max(...rows.map(r => parseFloat(r.total_multiplier))) - 
-                        Math.min(...rows.map(r => parseFloat(r.total_multiplier)));
-
-  res.json({
-    results: rows,
-    agreement,
-    multiplier_variance: multiplierDiff.toFixed(2),
-    recommendation: multiplierDiff > 0.5 
-      ? 'Significant variance - consider third opinion'
-      : 'Results consistent'
-  });
-});
-
-// ===== ADMIN/STATUS =====
-
-router.get('/admin/grading-queue', async (req, res) => {
+export async function getAdminGradingQueue(req, res) {
   const { status = 'all', grader, overdue_only = false } = req.query;
 
-  let where = 'WHERE 1=1';
-  const params = [];
+  try {
+    let query = supabase
+      .from('grading_submissions')
+      .select(`
+        *,
+        diamonds!inner(estimated_carat, shape, jeweler_id),
+        jewelers!inner(business_name)
+      `)
+      .order('submitted_at');
 
-  if (status !== 'all') {
-    where += ` AND gs.status = $${params.length + 1}`;
-    params.push(status);
-  }
-  if (grader) {
-    where += ` AND gs.grader = $${params.length + 1}`;
-    params.push(grader);
-  }
-  if (overdue_only === 'true') {
-    where += ` AND gs.expected_completion_at < NOW() AND gs.status = 'submitted'`;
-  }
-
-  const { rows } = await pool.query(`
-    SELECT 
-      gs.*,
-      d.estimated_carat, d.shape, d.jeweler_id,
-      j.business_name,
-      EXTRACT(EPOCH FROM (NOW() - gs.submitted_at))/86400 as days_in_queue,
-      gs.expected_completion_at,
-      CASE 
-        WHEN gs.expected_completion_at < NOW() THEN 'overdue'
-        WHEN gs.expected_completion_at < NOW() + INTERVAL '3 days' THEN 'at_risk'
-        ELSE 'on_track'
-      END as timeline_status
-    FROM grading_submissions gs
-    JOIN diamonds d ON gs.diamond_id = d.id
-    JOIN jewelers j ON d.jeweler_id = j.id
-    ${where}
-    ORDER BY gs.submitted_at
-  `, params);
-
-  res.json({ 
-    queue: rows,
-    summary: {
-      total: rows.length,
-      overdue: rows.filter(r => r.timeline_status === 'overdue').length,
-      at_risk: rows.filter(r => r.timeline_status === 'at_risk').length,
-      avg_days: rows.reduce((a, b) => a + parseFloat(b.days_in_queue), 0) / rows.length
+    if (status !== 'all') query = query.eq('status', status);
+    if (grader) query = query.eq('grader', grader);
+    if (overdue_only === 'true') {
+      query = query.lt('expected_completion_at', new Date().toISOString()).eq('status', 'submitted');
     }
-  });
-});
 
-// Grading metrics dashboard
-router.get('/admin/grading-metrics', async (req, res) => {
-  const { days = 30 } = req.query;
+    const { data: rows } = await query;
 
-  const { rows } = await pool.query(`
-    SELECT 
-      DATE_TRUNC('day', date) as day,
-      grader,
-      service_level,
-      SUM(submitted) as submitted,
-      SUM(completed) as completed,
-      AVG(time_days) as avg_time_days,
-      AVG(multiplier) as avg_multiplier
-    FROM grading_metrics
-    WHERE date > NOW() - INTERVAL '${days} days'
-    GROUP BY 1, 2, 3
-    ORDER BY 1 DESC
-  `);
+    const enriched = rows?.map(r => ({
+      ...r,
+      days_in_queue: (new Date() - new Date(r.submitted_at)) / (1000 * 60 * 60 * 24),
+      timeline_status: r.expected_completion_at < new Date().toISOString() ? 'overdue' :
+                       new Date(r.expected_completion_at) < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) ? 'at_risk' : 'on_track'
+    }));
 
-  res.json({ metrics: rows });
-});
+    return res.json({
+      queue: enriched,
+      summary: {
+        total: enriched?.length || 0,
+        overdue: enriched?.filter(r => r.timeline_status === 'overdue').length || 0,
+        at_risk: enriched?.filter(r => r.timeline_status === 'at_risk').length || 0
+      }
+    });
 
-export default router;
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load queue' });
+  }
+}
