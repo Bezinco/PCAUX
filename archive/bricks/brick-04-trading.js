@@ -1,63 +1,46 @@
-// brick-04-trading.js
-// PCAux Diamond Platform - Brick #4: Pre-Grade Trading Market
-// Order book, price discovery, 30-day window, fee collection
+// archive/bricks/brick-04-trading.js
+// PCAux Diamond Platform - Brick #4: Trading Market (Vercel/Supabase)
 
-import express from 'express';
-import { Pool } from 'pg';
-import { body, validationResult } from 'express-validator';
-import { requireAuth } from './brick-01-auth.js';
+import { createClient } from '@supabase/supabase-js';
 
-const router = express.Router();
-const pool = new Pool();
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
-// Trading configuration
 const PREGRADE_DAYS_DEFAULT = 30;
-const MIN_PRICE_TICK = 0.01;
-const MAKER_FEE_BPS = 25; // 0.25%
-const TAKER_FEE_BPS = 50; // 0.50%
-const PLATFORM_FEE_BPS = 75; // 0.75% total (split maker/taker)
+const MAKER_FEE_BPS = 25;
+const TAKER_FEE_BPS = 50;
 
-// ===== ORDER BOOK =====
+// ===== ORDER MANAGEMENT =====
 
-// Place limit order (maker)
-router.post('/diamonds/:diamondId/orders', requireAuth, [
-  body('side').isIn(['buy', 'sell']),
-  body('price').isFloat({ min: 0.01 }),
-  body('quantity').isInt({ min: 1 }),
-  body('order_type').optional().isIn(['limit', 'ioc', 'fok']).default('limit')
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
+export async function placeOrder(req, res) {
   const { diamondId } = req.params;
   const { side, price, quantity, order_type = 'limit' } = req.body;
   const userId = req.user.id;
 
-  const client = await pool.connect();
-
   try {
-    await client.query('BEGIN');
-
-    // Verify diamond is in pre-grade trading window
-    const { rows: [diamond] } = await client.query(`
-      SELECT d.*, i.ipo_price, i.total_pcus, i.sold_pcus, i.closes_at as ipo_closed_at
-      FROM diamonds d
-      JOIN ipos i ON d.id = i.diamond_id
-      WHERE d.id = $1 AND d.status = 'listing'
-    `, [diamondId]);
+    // Verify diamond is in trading window
+    const { data: diamond } = await supabase
+      .from('diamonds')
+      .select(`
+        *,
+        ipos!inner(ipo_price, total_pcus, sold_pcus, closes_at as ipo_closed_at)
+      `)
+      .eq('id', diamondId)
+      .eq('status', 'listing')
+      .single();
 
     if (!diamond) {
-      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Diamond not in trading window' });
     }
 
-    // Check if still in pre-grade window
-    const ipoClosed = new Date(diamond.ipo_closed_at);
+    // Check trading window
+    const ipoClosed = new Date(diamond.ipos.ipo_closed_at);
     const windowEnd = new Date(ipoClosed);
     windowEnd.setDate(windowEnd.getDate() + PREGRADE_DAYS_DEFAULT);
-    
+
     if (new Date() > windowEnd) {
-      await client.query('ROLLBACK');
       return res.status(400).json({ 
         error: 'Pre-grade trading window closed',
         window_closed_at: windowEnd
@@ -66,28 +49,32 @@ router.post('/diamonds/:diamondId/orders', requireAuth, [
 
     // For sell orders: verify PCU holdings
     if (side === 'sell') {
-      const { rows: [holding] } = await client.query(`
-        SELECT quantity FROM pcu_balances WHERE user_id = $1 AND diamond_id = $2
-      `, [userId, diamondId]);
+      const { data: holding } = await supabase
+        .from('pcu_balances')
+        .select('quantity')
+        .eq('user_id', userId)
+        .eq('diamond_id', diamondId)
+        .single();
 
       const available = holding?.quantity || 0;
-      
-      // Check existing sell orders
-      const { rows: [pending] } = await client.query(`
-        SELECT COALESCE(SUM(quantity - filled_quantity), 0) as pending
-        FROM orders WHERE user_id = $1 AND diamond_id = $2 AND side = 'sell' AND status IN ('open', 'partial')
-      `, [userId, diamondId]);
 
-      const availableAfterPending = available - (pending?.pending || 0);
-      
+      // Check pending sell orders
+      const { data: pending } = await supabase
+        .from('orders')
+        .select('quantity, filled_quantity')
+        .eq('user_id', userId)
+        .eq('diamond_id', diamondId)
+        .eq('side', 'sell')
+        .in('status', ['open', 'partial']);
+
+      const pendingQty = pending?.reduce((sum, o) => sum + (o.quantity - o.filled_quantity), 0) || 0;
+      const availableAfterPending = available - pendingQty;
+
       if (quantity > availableAfterPending) {
-        await client.query('ROLLBACK');
         return res.status(400).json({
           error: 'Insufficient PCUs',
           available: availableAfterPending,
-          requested: quantity,
-          total_held: available,
-          pending_orders: pending?.pending || 0
+          requested: quantity
         });
       }
     }
@@ -95,12 +82,13 @@ router.post('/diamonds/:diamondId/orders', requireAuth, [
     // For buy orders: verify USD balance
     if (side === 'buy') {
       const totalCost = price * quantity;
-      const { rows: [balance] } = await client.query(`
-        SELECT balance FROM user_balances WHERE user_id = $1
-      `, [userId]);
+      const { data: balance } = await supabase
+        .from('user_balances')
+        .select('balance')
+        .eq('user_id', userId)
+        .single();
 
       if (!balance || balance.balance < totalCost) {
-        await client.query('ROLLBACK');
         return res.status(402).json({
           error: 'Insufficient balance',
           required: totalCost,
@@ -109,44 +97,36 @@ router.post('/diamonds/:diamondId/orders', requireAuth, [
       }
 
       // Reserve balance
-      await client.query(`
-        UPDATE user_balances 
-        SET balance = balance - $2, reserved = COALESCE(reserved, 0) + $2
-        WHERE user_id = $1
-      `, [userId, totalCost]);
+      await supabase
+        .from('user_balances')
+        .update({ 
+          balance: balance.balance - totalCost, 
+          reserved: (balance.reserved || 0) + totalCost,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
     }
 
     // Create order
-    const { rows: [order] } = await client.query(`
-      INSERT INTO orders (
-        diamond_id, user_id, side, order_type, price, quantity,
-        filled_quantity, status, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, 0, 'open', NOW())
-      RETURNING *
-    `, [diamondId, userId, side, order_type, price, quantity]);
+    const { data: order, error } = await supabase
+      .from('orders')
+      .insert({
+        diamond_id: diamondId,
+        user_id: userId,
+        side,
+        order_type,
+        price,
+        quantity,
+        filled_quantity: 0,
+        status: 'open',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
 
-    // Try to match immediately if IOC or if crossing spread
-    if (order_type === 'ioc' || order_type === 'fok') {
-      const fillResult = await matchOrder(client, order.id, diamondId, side, price, quantity, order_type);
-      
-      if (order_type === 'fok' && fillResult.filled < quantity) {
-        // Cancel and refund
-        await client.query(`UPDATE orders SET status = 'cancelled' WHERE id = $1`, [order.id]);
-        if (side === 'buy') {
-          await client.query(`
-            UPDATE user_balances 
-            SET balance = balance + $2, reserved = reserved - $2
-            WHERE user_id = $1
-          `, [userId, price * quantity]);
-        }
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'FOK order could not be filled', filled: fillResult.filled });
-      }
-    }
+    if (error) throw error;
 
-    await client.query('COMMIT');
-
-    res.status(201).json({
+    return res.status(201).json({
       order_id: order.id,
       diamond_id: diamondId,
       side,
@@ -158,301 +138,208 @@ router.post('/diamonds/:diamondId/orders', requireAuth, [
     });
 
   } catch (err) {
-    await client.query('ROLLBACK');
     console.error('Order creation error:', err);
-    res.status(500).json({ error: 'Order failed' });
-  } finally {
-    client.release();
+    return res.status(500).json({ error: 'Order failed' });
   }
-});
-
-// Match orders (internal function)
-async function matchOrder(client, orderId, diamondId, side, price, quantity, orderType) {
-  const oppositeSide = side === 'buy' ? 'sell' : 'buy';
-  const comparator = side === 'buy' ? '<=' : '>='; // Buy matches sells at <= price, sell matches buys at >= price
-
-  // Find matching orders
-  const { rows: matches } = await client.query(`
-    SELECT * FROM orders 
-    WHERE diamond_id = $1 AND side = $2 AND status IN ('open', 'partial')
-      AND price ${comparator} $3
-    ORDER BY price ${side === 'buy' ? 'ASC' : 'DESC'}, created_at ASC
-    FOR UPDATE SKIP LOCKED
-  `, [diamondId, oppositeSide, price]);
-
-  let remaining = quantity;
-  const fills = [];
-
-  for (const match of matches) {
-    if (remaining <= 0) break;
-
-    const matchAvailable = match.quantity - match.filled_quantity;
-    const fillQty = Math.min(remaining, matchAvailable);
-    const fillPrice = match.price; // Price improvement: match price, not order price
-
-    // Create fill record
-    const { rows: [fill] } = await client.query(`
-      INSERT INTO fills (buy_order_id, sell_order_id, diamond_id, price, quantity, buyer_fee, seller_fee, created_at)
-      VALUES (
-        CASE WHEN $1 = 'buy' THEN $2 ELSE $3 END,
-        CASE WHEN $1 = 'sell' THEN $2 ELSE $3 END,
-        $4, $5, $6,
-        $5 * $6 * ${TAKER_FEE_BPS / 10000},
-        $5 * $6 * ${MAKER_FEE_BPS / 10000},
-        NOW()
-      ) RETURNING *
-    `, [side, orderId, match.id, diamondId, fillPrice, fillQty]);
-
-    fills.push(fill);
-
-    // Update PCU balances
-    const buyerId = side === 'buy' ? orderId : match.user_id; // Simplified - need actual user lookup
-    const sellerId = side === 'sell' ? orderId : match.user_id;
-
-    // Actually need to fetch user IDs properly
-    const { rows: [orderUser] } = await client.query(`SELECT user_id FROM orders WHERE id = $1`, [orderId]);
-    const { rows: [matchUser] } = await client.query(`SELECT user_id FROM orders WHERE id = $1`, [match.id]);
-
-    const buyerUserId = side === 'buy' ? orderUser.user_id : matchUser.user_id;
-    const sellerUserId = side === 'sell' ? orderUser.user_id : matchUser.user_id;
-
-    // Transfer PCUs
-    await client.query(`
-      INSERT INTO pcu_balances (user_id, diamond_id, ipo_id, quantity, acquired_at)
-      VALUES ($1, $2, (SELECT ipo_id FROM orders WHERE id = $3), $4, NOW())
-      ON CONFLICT (user_id, diamond_id) 
-      DO UPDATE SET quantity = pcu_balances.quantity + $4, updated_at = NOW()
-    `, [buyerUserId, diamondId, match.id, fillQty]);
-
-    await client.query(`
-      UPDATE pcu_balances SET quantity = quantity - $3, updated_at = NOW()
-      WHERE user_id = $1 AND diamond_id = $2
-    `, [sellerUserId, diamondId, fillQty]);
-
-    // Update matched order
-    const newFilled = match.filled_quantity + fillQty;
-    const newStatus = newFilled >= match.quantity ? 'filled' : 'partial';
-    await client.query(`
-      UPDATE orders SET filled_quantity = $2, status = $3 WHERE id = $1
-    `, [match.id, newFilled, newStatus]);
-
-    remaining -= fillQty;
-  }
-
-  // Update original order
-  const filledQty = quantity - remaining;
-  const finalStatus = remaining <= 0 ? 'filled' : (orderType === 'ioc' ? 'cancelled' : 'partial');
-  
-  await client.query(`
-    UPDATE orders SET filled_quantity = $2, status = $3 WHERE id = $1
-  `, [orderId, filledQty, finalStatus]);
-
-  // Release reserved balance for unfilled portion if buy order
-  if (side === 'buy' && remaining > 0) {
-    const { rows: [orderUser] } = await client.query(`SELECT user_id FROM orders WHERE id = $1`, [orderId]);
-    await client.query(`
-      UPDATE user_balances 
-      SET balance = balance + $2, reserved = reserved - $2
-      WHERE user_id = $1
-    `, [orderUser.user_id, price * remaining]);
-  }
-
-  return { filled: filledQty, remaining, fills };
 }
 
-// Cancel order
-router.post('/orders/:orderId/cancel', requireAuth, async (req, res) => {
+export async function cancelOrder(req, res) {
   const { orderId } = req.params;
   const userId = req.user.id;
 
-  const client = await pool.connect();
-
   try {
-    await client.query('BEGIN');
-
-    const { rows: [order] } = await client.query(`
-      SELECT * FROM orders WHERE id = $1 AND user_id = $2 AND status IN ('open', 'partial')
-    `, [orderId, userId]);
+    const { data: order } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .eq('user_id', userId)
+      .in('status', ['open', 'partial'])
+      .single();
 
     if (!order) {
-      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Order not found or not cancellable' });
     }
 
     // Release reserved balance if buy order
     if (order.side === 'buy') {
       const unfilledValue = (order.quantity - order.filled_quantity) * order.price;
-      await client.query(`
-        UPDATE user_balances 
-        SET balance = balance + $2, reserved = reserved - $2
-        WHERE user_id = $1
-      `, [userId, unfilledValue]);
+      
+      const { data: balance } = await supabase
+        .from('user_balances')
+        .select('balance, reserved')
+        .eq('user_id', userId)
+        .single();
+
+      await supabase
+        .from('user_balances')
+        .update({
+          balance: (balance.balance || 0) + unfilledValue,
+          reserved: Math.max(0, (balance.reserved || 0) - unfilledValue),
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
     }
 
-    await client.query(`UPDATE orders SET status = 'cancelled' WHERE id = $1`, [orderId]);
+    await supabase
+      .from('orders')
+      .update({ status: 'cancelled' })
+      .eq('id', orderId);
 
-    await client.query('COMMIT');
-
-    res.json({ message: 'Order cancelled', order_id: orderId });
+    return res.json({ message: 'Order cancelled', order_id: orderId });
 
   } catch (err) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: 'Cancel failed' });
-  } finally {
-    client.release();
+    return res.status(500).json({ error: 'Cancel failed' });
   }
-});
+}
 
 // ===== MARKET DATA =====
 
-// Get order book for diamond
-router.get('/diamonds/:diamondId/orderbook', async (req, res) => {
+export async function getOrderBook(req, res) {
   const { diamondId } = req.params;
   const { depth = 20 } = req.query;
 
   try {
-    // Bids (buy orders)
-    const { rows: bids } = await pool.query(`
-      SELECT price, SUM(quantity - filled_quantity) as size
-      FROM orders
-      WHERE diamond_id = $1 AND side = 'buy' AND status IN ('open', 'partial')
-      GROUP BY price
-      ORDER BY price DESC
-      LIMIT $2
-    `, [diamondId, depth]);
+    // Bids
+    const { data: bids } = await supabase
+      .from('orders')
+      .select('price, quantity, filled_quantity')
+      .eq('diamond_id', diamondId)
+      .eq('side', 'buy')
+      .in('status', ['open', 'partial'])
+      .order('price', { ascending: false })
+      .limit(depth);
 
-    // Asks (sell orders)
-    const { rows: asks } = await pool.query(`
-      SELECT price, SUM(quantity - filled_quantity) as size
-      FROM orders
-      WHERE diamond_id = $1 AND side = 'sell' AND status IN ('open', 'partial')
-      GROUP BY price
-      ORDER BY price ASC
-      LIMIT $2
-    `, [diamondId, depth]);
+    // Asks
+    const { data: asks } = await supabase
+      .from('orders')
+      .select('price, quantity, filled_quantity')
+      .eq('diamond_id', diamondId)
+      .eq('side', 'sell')
+      .in('status', ['open', 'partial'])
+      .order('price', { ascending: true })
+      .limit(depth);
 
-    // Spread and mid
-    const bestBid = bids[0]?.price || 0;
-    const bestAsk = asks[0]?.price || 0;
-    const spread = bestAsk - bestBid;
-    const mid = (bestBid + bestAsk) / 2;
+    // Aggregate by price
+    const bidAggregates = {};
+    bids?.forEach(b => {
+      const available = b.quantity - (b.filled_quantity || 0);
+      bidAggregates[b.price] = (bidAggregates[b.price] || 0) + available;
+    });
+
+    const askAggregates = {};
+    asks?.forEach(a => {
+      const available = a.quantity - (a.filled_quantity || 0);
+      askAggregates[a.price] = (askAggregates[a.price] || 0) + available;
+    });
+
+    const bidList = Object.entries(bidAggregates)
+      .map(([price, size]) => ({ price: parseFloat(price), size }))
+      .sort((a, b) => b.price - a.price)
+      .slice(0, depth);
+
+    const askList = Object.entries(askAggregates)
+      .map(([price, size]) => ({ price: parseFloat(price), size }))
+      .sort((a, b) => a.price - b.price)
+      .slice(0, depth);
+
+    const bestBid = bidList[0]?.price || 0;
+    const bestAsk = askList[0]?.price || 0;
 
     // Recent trades
-    const { rows: trades } = await pool.query(`
-      SELECT price, quantity, created_at as time
-      FROM fills
-      WHERE diamond_id = $1
-      ORDER BY created_at DESC
-      LIMIT 50
-    `, [diamondId]);
+    const { data: trades } = await supabase
+      .from('fills')
+      .select('price, quantity, created_at')
+      .eq('diamond_id', diamondId)
+      .order('created_at', { ascending: false })
+      .limit(50);
 
-    res.json({
+    return res.json({
       diamond_id: diamondId,
-      bids,
-      asks,
-      spread,
-      mid,
+      bids: bidList,
+      asks: askList,
+      spread: bestAsk - bestBid,
+      mid: (bestBid + bestAsk) / 2,
       recent_trades: trades,
       timestamp: new Date()
     });
 
   } catch (err) {
-    res.status(500).json({ error: 'Failed to load order book' });
+    return res.status(500).json({ error: 'Failed to load order book' });
   }
-});
+}
 
-// Get price history (candles)
-router.get('/diamonds/:diamondId/candles', async (req, res) => {
-  const { diamondId } = req.params;
-  const { interval = '1h', limit = 100 } = req.query;
-
+export async function getMyOrders(req, res) {
   try {
-    const { rows } = await pool.query(`
-      SELECT 
-        date_trunc($1, created_at) as time,
-        MIN(price) as low,
-        MAX(price) as high,
-        (SELECT price FROM fills WHERE diamond_id = $2 AND date_trunc($1, created_at) = date_trunc($1, f.created_at) ORDER BY created_at ASC LIMIT 1) as open,
-        (SELECT price FROM fills WHERE diamond_id = $2 AND date_trunc($1, created_at) = date_trunc($1, f.created_at) ORDER BY created_at DESC LIMIT 1) as close,
-        SUM(quantity) as volume
-      FROM fills f
-      WHERE diamond_id = $2
-      GROUP BY date_trunc($1, created_at)
-      ORDER BY time DESC
-      LIMIT $3
-    `, [interval, diamondId, limit]);
+    const { data: orders } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        diamonds!inner(estimated_carat, shape),
+        jewelers!inner(business_name as jeweler_name)
+      `)
+      .eq('user_id', req.user.id)
+      .in('status', ['open', 'partial'])
+      .order('created_at', { ascending: false });
 
-    res.json({ candles: rows.reverse() });
+    return res.json({ orders });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to load candles' });
+    return res.status(500).json({ error: 'Failed to load orders' });
   }
-});
+}
 
-// ===== MY ORDERS & TRADES =====
-
-// Get my open orders
-router.get('/my/orders', requireAuth, async (req, res) => {
+export async function getMyTrades(req, res) {
   try {
-    const { rows } = await pool.query(`
-      SELECT o.*, d.estimated_carat, d.shape, j.business_name as jeweler_name
-      FROM orders o
-      JOIN diamonds d ON o.diamond_id = d.id
-      JOIN jewelers j ON d.jeweler_id = j.id
-      WHERE o.user_id = $1 AND o.status IN ('open', 'partial')
-      ORDER BY o.created_at DESC
-    `, [req.user.id]);
+    const { data: fills } = await supabase
+      .from('fills')
+      .select(`
+        *,
+        diamonds!inner(estimated_carat, shape),
+        jewelers!inner(business_name as jeweler_name),
+        buy_orders!inner(user_id as buyer_id),
+        sell_orders!inner(user_id as seller_id)
+      `)
+      .or(`buy_orders.user_id.eq.${req.user.id},sell_orders.user_id.eq.${req.user.id}`)
+      .order('created_at', { ascending: false })
+      .limit(100);
 
-    res.json({ orders: rows });
+    const trades = fills?.map(f => ({
+      ...f,
+      my_side: f.buyer_id === req.user.id ? 'buy' : 'sell'
+    }));
+
+    return res.json({ trades });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to load orders' });
+    return res.status(500).json({ error: 'Failed to load trades' });
   }
-});
+}
 
-// Get my trade history
-router.get('/my/trades', requireAuth, async (req, res) => {
+export async function getMarketStats(req, res) {
   try {
-    const { rows } = await pool.query(`
-      SELECT 
-        f.*,
-        CASE WHEN o_buy.user_id = $1 THEN 'buy' ELSE 'sell' END as my_side,
-        d.estimated_carat, d.shape,
-        j.business_name as jeweler_name
-      FROM fills f
-      JOIN orders o_buy ON f.buy_order_id = o_buy.id
-      JOIN orders o_sell ON f.sell_order_id = o_sell.id
-      JOIN diamonds d ON f.diamond_id = d.id
-      JOIN jewelers j ON d.jeweler_id = j.id
-      WHERE o_buy.user_id = $1 OR o_sell.user_id = $1
-      ORDER BY f.created_at DESC
-      LIMIT 100
-    `, [req.user.id]);
+    const { data: stats } = await supabase
+      .from('fills')
+      .select(`
+        count,
+        quantity,
+        price,
+        buyer_fee,
+        seller_fee
+      `)
+      .gt('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-    res.json({ trades: rows });
+    const totalFills = stats?.length || 0;
+    const totalVolume = stats?.reduce((sum, f) => sum + (f.quantity || 0), 0) || 0;
+    const totalValue = stats?.reduce((sum, f) => sum + ((f.price || 0) * (f.quantity || 0)), 0) || 0;
+    const totalFees = stats?.reduce((sum, f) => sum + ((f.buyer_fee || 0) + (f.seller_fee || 0)), 0) || 0;
+
+    return res.json({
+      total_fills_24h: totalFills,
+      total_pcus_traded: totalVolume,
+      total_volume: totalValue,
+      total_fees: totalFees,
+      avg_trade_price: totalFills > 0 ? totalValue / totalVolume : 0
+    });
+
   } catch (err) {
-    res.status(500).json({ error: 'Failed to load trades' });
+    return res.status(500).json({ error: 'Failed to load stats' });
   }
-});
-
-// ===== MARKET METRICS =====
-
-// Get trading volume stats
-router.get('/market/stats', async (req, res) => {
-  try {
-    const { rows: [stats] } = await pool.query(`
-      SELECT 
-        COUNT(DISTINCT diamond_id) as active_diamonds,
-        COUNT(*) as total_orders_24h,
-        SUM(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN quantity ELSE 0 END) as volume_24h,
-        SUM(CASE WHEN created_at > NOW() - INTERVAL '7 days' THEN quantity ELSE 0 END) as volume_7d,
-        AVG(price) as avg_trade_price
-      FROM fills
-      WHERE created_at > NOW() - INTERVAL '7 days'
-    `);
-
-    res.json(stats);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to load stats' });
-  }
-});
-
-export default router;
+}
