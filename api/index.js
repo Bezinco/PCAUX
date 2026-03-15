@@ -1,16 +1,5 @@
 // api/index.js
-import { Pool } from 'pg';
-
-let pool = null;
-if (process.env.DATABASE_URL) {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
-}
-
 export default async function handler(req, res) {
-  // Simple path parsing - no URL constructor
   const fullPath = req.url || '';
   const path = fullPath.replace(/^\/api\//, '').split('?')[0] || '';
   const method = req.method;
@@ -22,7 +11,6 @@ export default async function handler(req, res) {
   if (method === 'OPTIONS') return res.status(200).end();
 
   try {
-    // Health check
     if (path === 'health' || path === '') {
       return res.status(200).json({ 
         status: 'alive', 
@@ -31,12 +19,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // Hello
     if (path === 'hello') {
       return res.status(200).json({ message: 'hello from PCAUX' });
     }
 
-    // Demo players
     if (path === 'demo/players') {
       return res.status(200).json({
         players: [
@@ -46,7 +32,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // 404
     return res.status(404).json({ error: 'Not found', path: fullPath });
 
   } catch (error) {
