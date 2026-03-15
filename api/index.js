@@ -1,4 +1,4 @@
-// api/[path].js
+// api/index.js
 import { Pool } from 'pg';
 
 let pool = null;
@@ -10,8 +10,10 @@ if (process.env.DATABASE_URL) {
 }
 
 export default async function handler(req, res) {
-  const path = req.query.path || '';
-  const fullPath = `/api/${path}`;
+  // Parse path from URL instead of query param
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const path = url.pathname.replace('/api/', '') || '';
+  const fullPath = url.pathname;
   const method = req.method;
 
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -26,7 +28,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ 
         status: 'alive', 
         timestamp: new Date().toISOString(),
-        service: path === '' ? 'PCAUX API' : undefined
+        path: fullPath
       });
     }
 
@@ -49,7 +51,7 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'Not found', path: fullPath });
 
   } catch (error) {
+    console.error('API Error:', error);
     return res.status(500).json({ error: 'Internal error' });
   }
 }
- 
