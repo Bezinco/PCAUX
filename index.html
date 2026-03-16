@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>PCAux — Competitive Auctions</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --text: #e5e7eb;
@@ -14,7 +15,7 @@
   --shadow: rgba(0,0,0,0.25);
 }
 
-/* ===== RESET & WALLPAPER ===== */
+/* === DYNAMIC WALLPAPER (Enhanced) === */
 * { box-sizing: border-box; margin:0; padding:0; }
 html, body { width:100%; height:100%; font-family:system-ui,sans-serif; overflow-x:hidden; }
 
@@ -24,14 +25,17 @@ body {
     radial-gradient(1200px 900px at 85% 20%, rgba(255,200,100,0.35), transparent 65%),
     radial-gradient(1000px 800px at 50% 85%, rgba(120,200,255,0.25), transparent 70%),
     linear-gradient(180deg, #040812 0%, #0a1228 35%, #020617 100%);
-  background-size:100% 100%;
+  background-size: 100% 100%;
+  min-height: 100vh;
   animation: backgroundDrift 25s ease-in-out infinite alternate;
-  position:relative;
+  position: relative;
   z-index:0;
+  perspective: 1200px;
 }
+
 body::before {
   content:"";
-  position:fixed; inset:0;
+  position: fixed; inset:0;
   background:
     repeating-linear-gradient(130deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 8px),
     radial-gradient(circle at center, rgba(255,255,255,0.08), transparent 60%);
@@ -41,11 +45,13 @@ body::before {
   z-index:0;
   pointer-events:none;
 }
+
 @keyframes backgroundDrift {
   0% { background-position: 15% 10%, 85% 20%, 50% 85%, center; }
   50% { background-position: 18% 15%, 82% 25%, 53% 80%, center; }
   100% { background-position: 15% 10%, 85% 20%, 50% 85%, center; }
 }
+
 @keyframes energyFlow {
   0% { background-position: 0 0, center; }
   50% { background-position: 300px 300px, center; }
@@ -54,14 +60,151 @@ body::before {
 
 /* ===== CONTAINER & GLOBAL ===== */
 .container { max-width:1200px; margin:0 auto; padding:40px 24px 96px; position:relative; z-index:1; }
-body, h1,h2,h3,p,a { color:var(--text); text-shadow:1px 1px 0 #0a1228,2px 2px 0 rgba(0,0,0,0.25),3px 3px 2px rgba(0,0,0,0.4); }
+body, h1, h2, h3, h4, h5, h6, p, a, span, div {
+  color: var(--text);
+  text-shadow:
+    1px 1px 0 #0a1228,
+    2px 2px 0 rgba(0,0,0,0.25),
+    3px 3px 2px rgba(0,0,0,0.4);
+}
 a { text-decoration:none; color:inherit; }
 
-/* ===== HEADER ===== */
-.header { display:flex; justify-content:space-between; align-items:center; padding-bottom:24px; border-bottom:1px solid var(--border); }
-.logo { font-weight:700; letter-spacing:0.04em; }
-.nav a { margin-left:20px; font-size:14px; color:var(--muted); }
-.nav a:hover { color:var(--text); }
+/* ===== CORNER 3D PCAUX LOGO (Enhanced) ===== */
+.pcaux-logo-corner {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 6px;
+  z-index: 9999;
+  font-family: 'Arial Black', sans-serif;
+  perspective: 1200px;
+}
+
+.pcaux-logo-corner span {
+  font-size: 48px;
+  font-weight: 900;
+  text-transform: uppercase;
+  background: linear-gradient(270deg, #ff99ff, #66ccff, #ccff66, #ffcc66, #ff66cc);
+  background-size: 800% 800%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow:
+    1px 1px 0 rgba(0,0,0,0.12),
+    2px 2px 0 rgba(0,0,0,0.08),
+    3px 3px 2px rgba(0,0,0,0.06),
+    0 0 6px rgba(255,255,255,0.1);
+  transform-style: preserve-3d;
+  animation: floatLogoZ 6s ease-in-out infinite alternate, gradientShift 20s ease infinite;
+  transition: transform 0.5s ease;
+}
+
+.pcaux-logo-corner span:hover {
+  transform: translateZ(40px) rotateY(20deg) scale(1.15);
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes floatLogoZ {
+  0% { transform: translateZ(0px); }
+  25% { transform: translateZ(15px); }
+  50% { transform: translateZ(30px); }
+  75% { transform: translateZ(15px); }
+  100% { transform: translateZ(0px); }
+}
+
+/* ===== HEADER (Enhanced) ===== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  display: none; /* Hide old logo since we have the corner logo */
+}
+
+.nav {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.nav a {
+  margin-left: 0;
+  font-size: 14px;
+  color: var(--text);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  background: #0f2040;
+}
+
+.nav a::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
+  transform: rotate(45deg) translateX(-100%);
+  pointer-events: none;
+  transition: transform 0.6s ease;
+}
+
+.nav a:hover::before {
+  transform: rotate(45deg) translateX(100%);
+}
+
+.nav a:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+}
+
+.user-info {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent);
+}
+
+.user-info.show {
+  display: flex;
+}
+
+.user-info span {
+  padding: 6px 12px;
+  background: #0f2040;
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.user-info a {
+  margin-left: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 6px;
+}
+
+.user-info a:hover {
+  transform: none;
+  box-shadow: none;
+  color: var(--accent);
+}
 
 /* ===== HERO ===== */
 .hero { text-align:center; padding:96px 0 72px; }
@@ -69,28 +212,38 @@ a { text-decoration:none; color:inherit; }
 .hero p { max-width:640px; margin:0 auto; font-size:18px; color:var(--muted); }
 .accent { color:var(--accent); }
 
-/* ===== 3D FRAMED PANELS ===== */
+/* ===== 3D FRAMED PANELS (Enhanced) ===== */
 .product-frame, .card-panel, .auction-panel, .trust-item {
   background: linear-gradient(180deg, #0f2040 0%, var(--panel) 100%);
-  border:2px solid var(--accent);
-  border-radius:16px;
-  padding:24px;
-  box-shadow:0 12px 30px rgba(0,0,0,0.8), inset 0 0 8px rgba(255,255,255,0.05);
+  border: 2px solid var(--accent);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.8);
+  transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
   transform: perspective(800px) rotateY(-7deg);
-  transition: transform 0.4s ease, box-shadow 0.3s ease, border-color 0.2s ease;
 }
+
 .product-frame::before, .card-panel::before, .auction-panel::before, .trust-item::before {
-  content:""; position:absolute; top:-50%; left:-50%; width:200%; height:200%;
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
   background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
   transform: rotate(45deg) translateX(-100%);
-  pointer-events:none;
-  transition: transform 0.6s ease;
+  pointer-events: none;
+  transition: transform 0.7s ease;
 }
+
 .product-frame:hover, .card-panel:hover, .auction-panel:hover, .trust-item:hover {
-  transform: perspective(800px) rotateY(0deg) scale(1.03);
-  box-shadow:0 20px 35px rgba(0,0,0,0.85);
-  border-color:var(--accent);
+  transform: perspective(800px) rotateY(0deg) scale(1.05);
+  box-shadow: 0 25px 45px rgba(0,0,0,0.9), inset 0 0 12px rgba(255,255,255,0.08);
+  border-color: var(--accent);
 }
+
 .product-frame:hover::before, .card-panel:hover::before, .auction-panel:hover::before, .trust-item:hover::before {
   transform: rotate(45deg) translateX(100%);
 }
@@ -101,28 +254,309 @@ a { text-decoration:none; color:inherit; }
 .meta { font-size:14px; color:var(--muted); line-height:1.6; }
 .auction-panel h3 { margin-top:0; margin-bottom:12px; font-size:20px; }
 .auction-panel p { font-size:14px; color:var(--muted); line-height:1.6; }
-.cta { margin-top:24px; padding:14px; text-align:center; border-radius:8px; background: rgba(201,162,77,0.08); border:1px solid rgba(201,162,77,0.25); font-weight:600; color:var(--accent); }
+
+/* ===== CTA BUTTON (Enhanced) ===== */
+.cta {
+  margin-top: 24px;
+  padding: 14px;
+  text-align: center;
+  border-radius: 8px;
+  background: #0f2040;
+  border: 2px solid var(--accent);
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.cta::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
+  transform: rotate(45deg) translateX(-100%);
+  pointer-events: none;
+  transition: transform 0.6s ease;
+}
+
+.cta:hover::before {
+  transform: rotate(45deg) translateX(100%);
+}
+
+.cta:hover {
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+}
 
 /* ===== TRUST GRID ===== */
 .trust { margin-top:64px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:24px; }
-.trust-item { font-size:14px; color:var(--muted); position:relative; }
 
-/* ===== FOOTER ===== */
-footer { margin-top:96px; padding-top:32px; border-top:1px solid var(--border); font-size:13px; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+/* ===== FOOTER (Enhanced) ===== */
+footer {
+  margin-top: 96px;
+  padding: 32px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
 
+footer a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+footer a:hover {
+  color: #fff;
+}
+
+/* ===== MODAL STYLES (Enhanced) ===== */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 99999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(8px);
+}
+
+.modal.show {
+  display: flex !important;
+}
+
+.modal-content {
+  background: linear-gradient(180deg, #1a2639 0%, #0f1420 100%);
+  border: 2px solid var(--accent);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 400px;
+  width: 90%;
+  position: relative;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+  animation: modalSlideIn 0.3s ease;
+  transform: none !important;
+}
+
+@keyframes modalSlideIn {
+  from { transform: translateY(-50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.modal h2 {
+  color: var(--accent);
+  margin-bottom: 24px;
+  font-size: 24px;
+  text-align: center;
+  text-shadow: none;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  text-shadow: none;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201, 162, 77, 0.2);
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.modal-buttons button {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  border: 2px solid var(--accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #dbb45c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(201, 162, 77, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #0f2040;
+  border: 2px solid var(--accent);
+  color: var(--text);
+}
+
+.btn-secondary:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+}
+
+.close-modal {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  color: var(--muted);
+  font-size: 28px;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.close-modal:hover {
+  color: var(--accent);
+  background: rgba(255,255,255,0.1);
+}
+
+.error-message {
+  color: #ff6b6b;
+  font-size: 14px;
+  margin-top: 8px;
+  display: none;
+  text-align: center;
+  padding: 8px;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 6px;
+}
+
+.error-message.show {
+  display: block;
+}
+
+.success-message {
+  color: #51cf66;
+  font-size: 14px;
+  margin-top: 8px;
+  display: none;
+  text-align: center;
+  padding: 8px;
+  background: rgba(81, 207, 102, 0.1);
+  border-radius: 6px;
+}
+
+.success-message.show {
+  display: block;
+}
+
+.loading-spinner {
+  display: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(201, 162, 77, 0.3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+
+.loading-spinner.show {
+  display: block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+.auth-toggle {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.auth-toggle a {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.auth-toggle a:hover {
+  color: #dbb45c;
+}
 </style>
 </head>
 
 <body>
+<!-- Corner 3D PCAUX Logo (Added) -->
+<div class="pcaux-logo-corner">
+  <span>P</span>
+  <span>C</span>
+  <span>A</span>
+  <span>U</span>
+  <span>X</span>
+</div>
+
 <div class="container">
 
   <header class="header">
-    <div class="logo">PCAux</div>
+    <div class="logo">PCAux</div> <!-- Hidden but kept for structure -->
     <nav class="nav">
       <a href="#">How It Works</a>
       <a href="#">Auctions</a>
       <a href="#">Rules</a>
-      <a href="#">Sign In</a>
+      <a href="#" id="login-btn">Sign In</a>
+      <div class="user-info" id="user-info">
+        <span id="user-email"></span>
+        <a href="#" id="logout-btn" style="color: var(--muted);">(Logout)</a>
+      </div>
     </nav>
   </header>
 
@@ -168,6 +602,7 @@ footer { margin-top:96px; padding-top:32px; border-top:1px solid var(--border); 
     <div class="trust-item">Governed by Canadian law.</div>
   </section>
 
+  <!-- FOOTER -->
   <footer>
     <div>© PCAux</div>
     <div>
@@ -178,6 +613,274 @@ footer { margin-top:96px; padding-top:32px; border-top:1px solid var(--border); 
   </footer>
 
 </div>
+
+<!-- LOGIN MODAL -->
+<div class="modal" id="login-modal">
+  <div class="modal-content">
+    <span class="close-modal" id="close-modal">&times;</span>
+    <h2 id="modal-title">Sign In to PCAux</h2>
+    
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="your@email.com" autocomplete="email">
+    </div>
+    
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    
+    <div class="error-message" id="error-message"></div>
+    <div class="success-message" id="success-message"></div>
+    <div class="loading-spinner" id="loading-spinner"></div>
+    
+    <div class="modal-buttons">
+      <button class="btn-secondary" id="cancel-btn">Cancel</button>
+      <button class="btn-primary" id="login-submit">Sign In</button>
+    </div>
+    
+    <div class="auth-toggle">
+      <span id="toggle-text">Don't have an account?</span>
+      <a id="toggle-link">Create Account</a>
+    </div>
+  </div>
+</div>
+
+<!-- SUPABASE AUTH SCRIPT - WITH SIGN UP -->
+<script>
+// YOUR SUPABASE CREDENTIALS
+const SUPABASE_URL = 'https://knceschbzidmqvosdwud.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuY2VzY2hiemlkbXF2b3Nkd3VkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NTY2MTgsImV4cCI6MjA4NjUzMjYxOH0.2lZXDSMAQwo4mD5y66-2d6kd6FXMvIFBmNbBgoSx56o';
+
+// CRITICAL FIX: Use correct CDN syntax
+const { createClient } = supabase;
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+document.addEventListener('DOMContentLoaded', async function() {
+    // UI Elements
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userInfo = document.getElementById('user-info');
+    const userEmail = document.getElementById('user-email');
+    const modal = document.getElementById('login-modal');
+    const closeModalBtn = document.getElementById('close-modal');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const loginSubmit = document.getElementById('login-submit');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const errorMessage = document.getElementById('error-message');
+    const successMessage = document.getElementById('success-message');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const modalTitle = document.getElementById('modal-title');
+    const toggleText = document.getElementById('toggle-text');
+    const toggleLink = document.getElementById('toggle-link');
+    
+    // State: 'signin' or 'signup'
+    let authMode = 'signin';
+    
+    // Check existing session
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) showLoggedIn(session.user);
+    
+    // Auth state listener
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+            showLoggedIn(session.user);
+            closeModal();
+        } else if (event === 'SIGNED_OUT') {
+            showLoggedOut();
+        }
+    });
+    
+    function showLoggedIn(user) {
+        loginBtn.style.display = 'none';
+        userInfo.classList.add('show');
+        userEmail.textContent = user.email;
+    }
+    
+    function showLoggedOut() {
+        loginBtn.style.display = 'block';
+        userInfo.classList.remove('show');
+        userEmail.textContent = '';
+    }
+    
+    function openModal(e) {
+        if (e) e.preventDefault();
+        resetModal();
+        modal.classList.add('show');
+        document.body.classList.add('modal-open');
+        setTimeout(() => emailInput.focus(), 100);
+    }
+    
+    function closeModal() {
+        modal.classList.remove('show');
+        document.body.classList.remove('modal-open');
+    }
+    
+    function resetModal() {
+        authMode = 'signin';
+        updateModalUI();
+        emailInput.value = '';
+        passwordInput.value = '';
+        hideMessages();
+    }
+    
+    function updateModalUI() {
+        if (authMode === 'signin') {
+            modalTitle.textContent = 'Sign In to PCAux';
+            loginSubmit.textContent = 'Sign In';
+            toggleText.textContent = "Don't have an account?";
+            toggleLink.textContent = 'Create Account';
+        } else {
+            modalTitle.textContent = 'Create Account';
+            loginSubmit.textContent = 'Create Account';
+            toggleText.textContent = 'Already have an account?';
+            toggleLink.textContent = 'Sign In';
+        }
+    }
+    
+    function toggleAuthMode() {
+        authMode = authMode === 'signin' ? 'signup' : 'signin';
+        updateModalUI();
+        hideMessages();
+        emailInput.focus();
+    }
+    
+    function hideMessages() {
+        errorMessage.classList.remove('show');
+        successMessage.classList.remove('show');
+        loadingSpinner.classList.remove('show');
+    }
+    
+    function showError(msg) {
+        errorMessage.textContent = msg;
+        errorMessage.classList.add('show');
+        successMessage.classList.remove('show');
+        loadingSpinner.classList.remove('show');
+        loginSubmit.disabled = false;
+    }
+    
+    function showSuccess(msg) {
+        successMessage.textContent = msg;
+        successMessage.classList.add('show');
+        errorMessage.classList.remove('show');
+        loadingSpinner.classList.remove('show');
+    }
+    
+    function setLoading(loading) {
+        loginSubmit.disabled = loading;
+        if (loading) {
+            loadingSpinner.classList.add('show');
+            loginSubmit.textContent = authMode === 'signin' ? 'Signing In...' : 'Creating Account...';
+        } else {
+            loadingSpinner.classList.remove('show');
+            updateModalUI();
+        }
+    }
+    
+    async function handleAuth() {
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        
+        hideMessages();
+        
+        if (!email || !password) {
+            showError('Please enter both email and password.');
+            return;
+        }
+        
+        if (password.length < 6) {
+            showError('Password must be at least 6 characters long.');
+            return;
+        }
+        
+        setLoading(true);
+        
+        try {
+            if (authMode === 'signin') {
+                // SIGN IN
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+                
+                if (error) {
+                    showError(error.message === 'Invalid login credentials' 
+                        ? 'Invalid email or password. Please try again.' 
+                        : error.message);
+                } else if (data?.user) {
+                    showSuccess('Welcome back!');
+                    setTimeout(() => {
+                        closeModal();
+                        showLoggedIn(data.user);
+                    }, 800);
+                }
+            } else {
+                // SIGN UP
+                const { data, error } = await supabaseClient.auth.signUp({
+                    email: email,
+                    password: password
+                });
+                
+                if (error) {
+                    showError(error.message);
+                } else if (data?.user) {
+                    // Check if email confirmation is required
+                    if (data.session) {
+                        // Auto-confirmed (email confirmation disabled)
+                        showSuccess('Account created successfully!');
+                        setTimeout(() => {
+                            closeModal();
+                            showLoggedIn(data.user);
+                        }, 800);
+                    } else {
+                        // Email confirmation required
+                        showSuccess('Account created! Please check your email to confirm your account.');
+                        setTimeout(() => {
+                            closeModal();
+                        }, 2000);
+                    }
+                }
+            }
+        } catch (err) {
+            showError('Connection error. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    }
+    
+    async function handleLogout(e) {
+        e.preventDefault();
+        await supabaseClient.auth.signOut();
+        showLoggedOut();
+    }
+    
+    // Event Listeners
+    loginBtn.addEventListener('click', openModal);
+    logoutBtn.addEventListener('click', handleLogout);
+    closeModalBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    loginSubmit.addEventListener('click', handleAuth);
+    toggleLink.addEventListener('click', toggleAuthMode);
+    
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeModal();
+    });
+    
+    [emailInput, passwordInput].forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleAuth();
+        });
+    });
+    
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('show')) {
+            closeModal();
+        }
+    });
+});
+</script>
+
 </body>
 </html>
 
