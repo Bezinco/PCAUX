@@ -2,29 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PCAux — Competitive Auctions</title>
+<title>PCAux — Competitive Gem Auctions</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --text: #e5e7eb;
+  --text-light: #f9fafb;
   --muted: #9ca3af;
   --accent: #c9a24d;
+  --accent-light: #dbb45c;
+  --accent-dark: #b38f3d;
   --panel: #111827;
+  --panel-light: #1f2937;
   --border: rgba(255,255,255,0.08);
+  --border-light: rgba(255,255,255,0.12);
   --shadow: rgba(0,0,0,0.25);
+  --shadow-strong: rgba(0,0,0,0.4);
+  --gradient-start: #040812;
+  --gradient-mid: #0a1228;
+  --gradient-end: #020617;
 }
 
-/* === DYNAMIC WALLPAPER (Enhanced) === */
+/* === DYNAMIC WALLPAPER === */
 * { box-sizing: border-box; margin:0; padding:0; }
-html, body { width:100%; height:100%; font-family:system-ui,sans-serif; overflow-x:hidden; }
+html, body { width:100%; height:100%; font-family: 'Inter', system-ui, -apple-system, sans-serif; overflow-x:hidden; }
 
 body {
   background:
     radial-gradient(1400px 700px at 15% 10%, rgba(90,160,255,0.4), transparent 60%),
     radial-gradient(1200px 900px at 85% 20%, rgba(255,200,100,0.35), transparent 65%),
     radial-gradient(1000px 800px at 50% 85%, rgba(120,200,255,0.25), transparent 70%),
-    linear-gradient(180deg, #040812 0%, #0a1228 35%, #020617 100%);
+    linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-mid) 35%, var(--gradient-end) 100%);
   background-size: 100% 100%;
   min-height: 100vh;
   animation: backgroundDrift 25s ease-in-out infinite alternate;
@@ -58,49 +67,56 @@ body::before {
   100% { background-position: 0 0, center; }
 }
 
-/* ===== CONTAINER & GLOBAL ===== */
+/* === CONTAINER & GLOBAL === */
 .container { max-width:1200px; margin:0 auto; padding:40px 24px 96px; position:relative; z-index:1; }
+
 body, h1, h2, h3, h4, h5, h6, p, a, span, div {
   color: var(--text);
-  text-shadow:
-    1px 1px 0 #0a1228,
-    2px 2px 0 rgba(0,0,0,0.25),
-    3px 3px 2px rgba(0,0,0,0.4);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
-a { text-decoration:none; color:inherit; }
 
-/* ===== CORNER 3D PCAUX LOGO (Enhanced) ===== */
+h1 { font-size: 48px; font-weight: 700; line-height: 1.1; }
+h2 { font-size: 32px; font-weight: 600; }
+h3 { font-size: 24px; font-weight: 600; }
+
+a { text-decoration:none; color:inherit; transition: color 0.2s ease; }
+
+/* === CORNER LOGO === */
 .pcaux-logo-corner {
   position: fixed;
   top: 20px;
   left: 20px;
   display: flex;
-  gap: 6px;
+  gap: 4px;
   z-index: 9999;
-  font-family: 'Arial Black', sans-serif;
+  font-family: 'Inter', 'Arial Black', sans-serif;
+  font-weight: 800;
   perspective: 1200px;
 }
 
 .pcaux-logo-corner span {
-  font-size: 48px;
-  font-weight: 900;
+  font-size: 42px;
+  font-weight: 800;
   text-transform: uppercase;
-  background: linear-gradient(270deg, #ff99ff, #66ccff, #ccff66, #ffcc66, #ff66cc);
-  background-size: 800% 800%;
+  background: linear-gradient(135deg, #ffd700, #ffb347, #ff8c42, #ff6b6b, #a78bfa);
+  background-size: 400% 400%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow:
-    1px 1px 0 rgba(0,0,0,0.12),
-    2px 2px 0 rgba(0,0,0,0.08),
-    3px 3px 2px rgba(0,0,0,0.06),
-    0 0 6px rgba(255,255,255,0.1);
+  text-shadow: 0 2px 10px rgba(255,215,0,0.3);
   transform-style: preserve-3d;
-  animation: floatLogoZ 6s ease-in-out infinite alternate, gradientShift 20s ease infinite;
-  transition: transform 0.5s ease;
+  animation: floatLogo 6s ease-in-out infinite, gradientShift 8s ease infinite;
+  transition: all 0.3s ease;
 }
 
-.pcaux-logo-corner span:hover {
-  transform: translateZ(40px) rotateY(20deg) scale(1.15);
+.pcaux-logo-corner span:nth-child(1) { animation-delay: 0s; }
+.pcaux-logo-corner span:nth-child(2) { animation-delay: 0.1s; }
+.pcaux-logo-corner span:nth-child(3) { animation-delay: 0.2s; }
+.pcaux-logo-corner span:nth-child(4) { animation-delay: 0.3s; }
+.pcaux-logo-corner span:nth-child(5) { animation-delay: 0.4s; }
+
+.pcaux-logo-corner:hover span {
+  transform: translateZ(30px) rotateY(15deg) scale(1.1);
+  filter: brightness(1.2);
 }
 
 @keyframes gradientShift {
@@ -109,218 +125,393 @@ a { text-decoration:none; color:inherit; }
   100% { background-position: 0% 50%; }
 }
 
-@keyframes floatLogoZ {
-  0% { transform: translateZ(0px); }
-  25% { transform: translateZ(15px); }
-  50% { transform: translateZ(30px); }
-  75% { transform: translateZ(15px); }
-  100% { transform: translateZ(0px); }
+@keyframes floatLogo {
+  0% { transform: translateZ(0px) translateY(0px); }
+  25% { transform: translateZ(15px) translateY(-2px); }
+  50% { transform: translateZ(30px) translateY(-4px); }
+  75% { transform: translateZ(15px) translateY(-2px); }
+  100% { transform: translateZ(0px) translateY(0px); }
 }
 
-/* ===== HEADER (Enhanced) ===== */
+/* === HEADER === */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 0;
+  padding: 24px 0 24px 80px;
   border-bottom: 1px solid var(--border);
-}
-
-.logo {
-  display: none; /* Hide old logo since we have the corner logo */
+  margin-bottom: 40px;
 }
 
 .nav {
   display: flex;
-  gap: 12px;
-  margin-left: auto;
+  gap: 16px;
 }
 
 .nav a {
-  margin-left: 0;
-  font-size: 14px;
-  color: var(--text);
-  text-decoration: none;
-  padding: 6px 12px;
-  border: 2px solid var(--accent);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 40px;
+  background: rgba(15, 32, 64, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-light);
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  background: #0f2040;
 }
 
 .nav a::before {
   content: "";
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
-  transform: rotate(45deg) translateX(-100%);
-  pointer-events: none;
-  transition: transform 0.6s ease;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  transition: left 0.6s ease;
 }
 
 .nav a:hover::before {
-  transform: rotate(45deg) translateX(100%);
+  left: 100%;
 }
 
 .nav a:hover {
-  transform: scale(1.05);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+#login-btn {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+  border: none;
+}
+
+#login-btn:hover {
+  background: var(--accent-light);
 }
 
 .user-info {
   display: none;
   align-items: center;
-  gap: 10px;
-  color: var(--accent);
+  gap: 16px;
+  background: rgba(15, 32, 64, 0.8);
+  backdrop-filter: blur(8px);
+  padding: 6px 16px 6px 20px;
+  border-radius: 40px;
+  border: 1px solid var(--border-light);
 }
 
 .user-info.show {
   display: flex;
 }
 
-.user-info span {
-  padding: 6px 12px;
-  background: #0f2040;
-  border: 2px solid var(--accent);
-  border-radius: 6px;
+#user-email {
   font-size: 14px;
-}
-
-.user-info a {
-  margin-left: 0;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  padding: 6px;
-}
-
-.user-info a:hover {
-  transform: none;
-  box-shadow: none;
+  font-weight: 500;
   color: var(--accent);
 }
 
-/* ===== HERO ===== */
-.hero { text-align:center; padding:96px 0 72px; }
-.hero h1 { font-size:44px; line-height:1.15; margin-bottom:16px; }
-.hero p { max-width:640px; margin:0 auto; font-size:18px; color:var(--muted); }
-.accent { color:var(--accent); }
-
-/* ===== 3D FRAMED PANELS (Enhanced) ===== */
-.product-frame, .card-panel, .auction-panel, .trust-item {
-  background: linear-gradient(180deg, #0f2040 0%, var(--panel) 100%);
-  border: 2px solid var(--accent);
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.8);
-  transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.2s ease;
-  position: relative;
-  overflow: hidden;
-  transform: perspective(800px) rotateY(-7deg);
+#logout-btn {
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
 }
 
-.product-frame::before, .card-panel::before, .auction-panel::before, .trust-item::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
-  transform: rotate(45deg) translateX(-100%);
-  pointer-events: none;
-  transition: transform 0.7s ease;
-}
-
-.product-frame:hover, .card-panel:hover, .auction-panel:hover, .trust-item:hover {
-  transform: perspective(800px) rotateY(0deg) scale(1.05);
-  box-shadow: 0 25px 45px rgba(0,0,0,0.9), inset 0 0 12px rgba(255,255,255,0.08);
+#logout-btn:hover {
+  background: rgba(255,255,255,0.1);
   border-color: var(--accent);
 }
 
-.product-frame:hover::before, .card-panel:hover::before, .auction-panel:hover::before, .trust-item:hover::before {
-  transform: rotate(45deg) translateX(100%);
+/* === HERO === */
+.hero {
+  text-align: center;
+  padding: 40px 0 80px;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-/* ===== GRID & PANEL LAYOUT ===== */
-.auction-grid { display:grid; grid-template-columns:2fr 1fr; gap:24px; }
-.card-image { height:260px; border-radius:12px; background:linear-gradient(135deg,#1f2937,#020617); display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:14px; margin-bottom:16px; }
-.meta { font-size:14px; color:var(--muted); line-height:1.6; }
-.auction-panel h3 { margin-top:0; margin-bottom:12px; font-size:20px; }
-.auction-panel p { font-size:14px; color:var(--muted); line-height:1.6; }
+.hero h1 {
+  margin-bottom: 20px;
+  line-height: 1.2;
+}
 
-/* ===== CTA BUTTON (Enhanced) ===== */
-.cta {
-  margin-top: 24px;
-  padding: 14px;
-  text-align: center;
-  border-radius: 8px;
-  background: #0f2040;
-  border: 2px solid var(--accent);
+.hero .accent {
+  color: var(--accent);
+  position: relative;
+  display: inline-block;
+}
+
+.hero .accent::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+.hero p {
+  font-size: 18px;
+  color: var(--muted);
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* === PRODUCT FRAME === */
+.product-frame {
+  background: rgba(15, 32, 64, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-light);
+  border-radius: 24px;
+  padding: 32px;
+  margin-bottom: 64px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  transition: all 0.4s ease;
+}
+
+.product-frame:hover {
+  border-color: var(--accent);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 0 2px rgba(201, 162, 77, 0.1);
+}
+
+.frame-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.frame-title {
+  font-size: 20px;
   font-weight: 600;
-  color: var(--text);
-  cursor: pointer;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+
+.status {
+  font-size: 13px;
+  padding: 6px 12px;
+  background: rgba(201, 162, 77, 0.15);
+  border-radius: 30px;
+  color: var(--accent);
+  border: 1px solid rgba(201, 162, 77, 0.3);
+}
+
+/* === AUCTION GRID === */
+.auction-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 32px;
+}
+
+.card-panel {
+  background: rgba(0,0,0,0.3);
+  border-radius: 20px;
+  padding: 24px;
+  border: 1px solid var(--border);
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.card-panel:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+}
+
+/* Video container styles */
+.card-image {
+  height: 280px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #2a3442, #1a1f2e);
+}
+
+.hero-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.video-overlay-text {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 8px 16px;
+  border-radius: 30px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.meta {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.7;
+  padding: 0 8px;
+}
+
+.meta span {
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+/* === AUCTION PANEL === */
+.auction-panel {
+  background: rgba(0,0,0,0.3);
+  border-radius: 20px;
+  padding: 32px 24px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.3s ease;
+}
+
+.auction-panel:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+}
+
+.auction-panel h3 {
+  color: var(--accent);
+  margin-bottom: 16px;
+  font-size: 26px;
+}
+
+.auction-panel p {
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 24px;
+  font-size: 15px;
+}
+
+/* === CTA BUTTON === */
+.cta {
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 16px 24px;
+  border-radius: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  letter-spacing: 0.5px;
+  box-shadow: 0 8px 20px rgba(201, 162, 77, 0.3);
+  position: relative;
+  overflow: hidden;
 }
 
 .cta::before {
-  content: "";
+  content: '';
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
-  transform: rotate(45deg) translateX(-100%);
-  pointer-events: none;
-  transition: transform 0.6s ease;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.6s ease;
 }
 
 .cta:hover::before {
-  transform: rotate(45deg) translateX(100%);
+  left: 100%;
 }
 
 .cta:hover {
-  transform: scale(1.05) translateY(-2px);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+  background: var(--accent-light);
+  transform: translateY(-4px);
+  box-shadow: 0 15px 30px rgba(201, 162, 77, 0.4);
 }
 
-/* ===== TRUST GRID ===== */
-.trust { margin-top:64px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:24px; }
+/* === TRUST GRID === */
+.trust {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  margin: 80px 0;
+}
 
-/* ===== FOOTER (Enhanced) ===== */
+.trust-item {
+  background: rgba(15, 32, 64, 0.5);
+  backdrop-filter: blur(5px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 20px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--muted);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.trust-item::before {
+  content: '✓';
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: bold;
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+.trust-item:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}
+
+.trust-item:hover::before {
+  opacity: 1;
+}
+
+/* === FOOTER === */
 footer {
-  margin-top: 96px;
+  margin-top: 80px;
   padding: 32px 0;
   border-top: 1px solid var(--border);
-  font-size: 13px;
-  color: var(--muted);
   display: flex;
   justify-content: space-between;
+  align-items: center;
   flex-wrap: wrap;
   gap: 16px;
+  font-size: 14px;
+  color: var(--muted);
 }
 
 footer a {
   color: var(--muted);
-  text-decoration: none;
-  transition: color 0.3s ease;
+  transition: color 0.2s ease;
+  padding: 4px 8px;
 }
 
 footer a:hover {
-  color: #fff;
+  color: var(--accent);
 }
 
-/* ===== MODAL STYLES (Enhanced) ===== */
+/* === MODAL STYLES === */
 .modal {
   display: none;
   position: fixed;
@@ -328,45 +519,75 @@ footer a:hover {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.85);
-  z-index: 99999;
-  justify-content: center;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(12px);
+  z-index: 10000;
   align-items: center;
-  backdrop-filter: blur(8px);
+  justify-content: center;
 }
 
 .modal.show {
-  display: flex !important;
+  display: flex;
 }
 
 .modal-content {
-  background: linear-gradient(180deg, #1a2639 0%, #0f1420 100%);
+  background: linear-gradient(180deg, #1f2a3f, #0f1420);
   border: 2px solid var(--accent);
-  border-radius: 16px;
-  padding: 32px;
-  max-width: 400px;
+  border-radius: 24px;
+  padding: 40px;
+  max-width: 440px;
   width: 90%;
   position: relative;
-  box-shadow: 0 25px 50px rgba(0,0,0,0.8);
-  animation: modalSlideIn 0.3s ease;
-  transform: none !important;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+  animation: modalSlideIn 0.4s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
 @keyframes modalSlideIn {
-  from { transform: translateY(-50px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.close-modal {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.3);
+  color: var(--muted);
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border);
+}
+
+.close-modal:hover {
+  background: rgba(201, 162, 77, 0.2);
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: rotate(90deg);
 }
 
 .modal h2 {
   color: var(--accent);
-  margin-bottom: 24px;
-  font-size: 24px;
+  margin-bottom: 32px;
+  font-size: 28px;
+  font-weight: 600;
   text-align: center;
-  text-shadow: none;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .form-group label {
@@ -374,15 +595,16 @@ footer a:hover {
   margin-bottom: 8px;
   color: var(--muted);
   font-size: 14px;
-  text-shadow: none;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .form-group input {
   width: 100%;
-  padding: 14px;
-  background: rgba(0, 0, 0, 0.5);
+  padding: 14px 16px;
+  background: rgba(0,0,0,0.3);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   color: var(--text);
   font-size: 16px;
   transition: all 0.3s ease;
@@ -392,85 +614,63 @@ footer a:hover {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(201, 162, 77, 0.2);
+  background: rgba(0,0,0,0.4);
 }
 
 .modal-buttons {
   display: flex;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 32px;
 }
 
-.modal-buttons button {
+.btn-primary, .btn-secondary {
   flex: 1;
   padding: 14px;
-  border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+  border: none;
 }
 
 .btn-primary {
   background: var(--accent);
   color: #000;
-  border: 2px solid var(--accent);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #dbb45c;
+  background: var(--accent-light);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(201, 162, 77, 0.3);
+  box-shadow: 0 8px 20px rgba(201, 162, 77, 0.3);
 }
 
 .btn-primary:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .btn-secondary {
-  background: #0f2040;
-  border: 2px solid var(--accent);
+  background: transparent;
+  border: 1px solid var(--border);
   color: var(--text);
 }
 
 .btn-secondary:hover {
-  transform: scale(1.05);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
-}
-
-.close-modal {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  color: var(--muted);
-  font-size: 28px;
-  cursor: pointer;
-  transition: color 0.3s ease;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.close-modal:hover {
-  color: var(--accent);
-  background: rgba(255,255,255,0.1);
+  border-color: var(--accent);
+  background: rgba(201, 162, 77, 0.1);
+  transform: translateY(-2px);
 }
 
 .error-message {
   color: #ff6b6b;
   font-size: 14px;
   margin-top: 8px;
-  display: none;
-  text-align: center;
-  padding: 8px;
+  padding: 8px 12px;
   background: rgba(255, 107, 107, 0.1);
-  border-radius: 6px;
+  border-radius: 8px;
+  border-left: 3px solid #ff6b6b;
+  display: none;
 }
 
 .error-message.show {
@@ -481,11 +681,11 @@ footer a:hover {
   color: #51cf66;
   font-size: 14px;
   margin-top: 8px;
-  display: none;
-  text-align: center;
-  padding: 8px;
+  padding: 8px 12px;
   background: rgba(81, 207, 102, 0.1);
-  border-radius: 6px;
+  border-radius: 8px;
+  border-left: 3px solid #51cf66;
+  display: none;
 }
 
 .success-message.show {
@@ -494,13 +694,13 @@ footer a:hover {
 
 .loading-spinner {
   display: none;
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(201, 162, 77, 0.3);
+  width: 24px;
+  height: 24px;
+  margin: 16px auto;
+  border: 3px solid rgba(201, 162, 77, 0.2);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-  margin: 0 auto;
 }
 
 .loading-spinner.show {
@@ -511,13 +711,9 @@ footer a:hover {
   to { transform: rotate(360deg); }
 }
 
-body.modal-open {
-  overflow: hidden;
-}
-
 .auth-toggle {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 24px;
   font-size: 14px;
   color: var(--muted);
 }
@@ -525,17 +721,66 @@ body.modal-open {
 .auth-toggle a {
   color: var(--accent);
   cursor: pointer;
+  font-weight: 500;
+  margin-left: 6px;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .auth-toggle a:hover {
-  color: #dbb45c;
+  color: var(--accent-light);
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .pcaux-logo-corner span {
+    font-size: 32px;
+  }
+  
+  .header {
+    padding-left: 60px;
+  }
+  
+  h1 { font-size: 36px; }
+  h2 { font-size: 28px; }
+  
+  .auction-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .nav {
+    gap: 8px;
+  }
+  
+  .nav a {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  
+  .trust {
+    grid-template-columns: 1fr;
+  }
+  
+  footer {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .video-overlay-text {
+    font-size: 14px;
+    bottom: 15px;
+    left: 15px;
+  }
 }
 </style>
 </head>
 
 <body>
-<!-- Corner 3D PCAUX Logo (Added) -->
+<!-- Corner 3D PCAUX Logo -->
 <div class="pcaux-logo-corner">
   <span>P</span>
   <span>C</span>
@@ -547,7 +792,6 @@ body.modal-open {
 <div class="container">
 
   <header class="header">
-    <div class="logo">PCAux</div> <!-- Hidden but kept for structure -->
     <nav class="nav">
       <a href="#">How It Works</a>
       <a href="#">Auctions</a>
@@ -555,68 +799,81 @@ body.modal-open {
       <a href="#" id="login-btn">Sign In</a>
       <div class="user-info" id="user-info">
         <span id="user-email"></span>
-        <a href="#" id="logout-btn" style="color: var(--muted);">(Logout)</a>
+        <a href="#" id="logout-btn">Logout</a>
       </div>
     </nav>
   </header>
 
   <section class="hero">
     <h1>
-      Competitive auctions.<br />
-      <span class="accent">No published prices.</span>
+      Where gems find their<br />
+      <span class="accent">true market value</span>
     </h1>
     <p>
-      PCAux is a live auction platform for collectible cards.
-      Outcomes are determined by judgment, timing, and competition — nothing else.
+      PCAux is a live auction platform for certified gemstones.
+      Every price is discovered through transparent competition — nothing else.
     </p>
   </section>
 
   <!-- PRODUCT FRAMING -->
   <section class="product-frame">
-    <div class="frame-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-      <div class="frame-title" style="font-weight:600; color:var(--accent);">Live Auction Environment</div>
-      <div class="status" style="font-size:12px; color:var(--muted);">Auction in progress</div>
+    <div class="frame-header">
+      <div class="frame-title">LIVE AUCTION ENVIRONMENT</div>
+      <div class="status">Auction in progress</div>
     </div>
 
     <div class="auction-grid">
       <div class="card-panel">
-        <div class="card-image">Card image placeholder</div>
+        <div class="card-image">
+          <video 
+            autoplay 
+            loop 
+            muted 
+            playsinline
+            class="hero-video"
+          >
+            <source src="videos/bisapslow.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+          <span class="video-overlay-text">96.34ct Kashmir Sapphire</span>
+        </div>
         <div class="meta">
-          Physical collectible card<br />
-          Owned and auctioned by PCAux<br />
-          Grading status may change over time
+          <span>Certified:</span> Branko Deljanin, CGL Vancouver<br />
+          <span>Status:</span> Pre-grade trading (14 days remaining)<br />
+          <span>Current bid:</span> $275/share
         </div>
       </div>
 
       <div class="auction-panel">
         <div>
-          <h3>Open Competitive Auction</h3>
+          <h3>Competitive Bidding</h3>
           <p>
-            PCAux does not set prices or values.
-            All outcomes are determined exclusively
-            by competitive bidding at close.
+            PCAux does not set prices. Every outcome is determined
+            exclusively by participant competition. The market speaks —
+            we just provide the arena.
           </p>
         </div>
-        <div class="cta">Participate in Auction</div>
+        <div class="cta">View Auction</div>
       </div>
     </div>
   </section>
 
   <!-- TRUST / LEGAL SIGNALS -->
   <section class="trust">
-    <div class="trust-item">PCAux is the seller of record for all items.</div>
-    <div class="trust-item">Participation grants no ownership until auction close.</div>
-    <div class="trust-item">No pricing, valuation, or investment guidance provided.</div>
-    <div class="trust-item">Governed by Canadian law.</div>
+    <div class="trust-item">PCAux is the seller of record for all gemstones.</div>
+    <div class="trust-item">Full transparency: every gem certified, serialized, vaulted.</div>
+    <div class="trust-item">2.5% fee each side funds platform operations and buybacks.</div>
+    <div class="trust-item">Governed by Canadian law. Physical redemption available.</div>
   </section>
 
   <!-- FOOTER -->
   <footer>
-    <div>© PCAux</div>
+    <div>© 2026 PCAux</div>
     <div>
-      <a href="#">Legal</a> ·
-      <a href="#">Responsible Play</a> ·
-      <a href="#">Terms</a>
+      <a href="#">Legal</a> · 
+      <a href="#">Terms</a> · 
+      <a href="#">Privacy</a> · 
+      <a href="#">Responsible Play</a>
     </div>
   </footer>
 
@@ -626,7 +883,7 @@ body.modal-open {
 <div class="modal" id="login-modal">
   <div class="modal-content">
     <span class="close-modal" id="close-modal">&times;</span>
-    <h2 id="modal-title">Sign In to PCAux</h2>
+    <h2 id="modal-title">Welcome to PCAux</h2>
     
     <div class="form-group">
       <label for="email">Email</label>
@@ -648,246 +905,210 @@ body.modal-open {
     </div>
     
     <div class="auth-toggle">
-      <span id="toggle-text">Don't have an account?</span>
+      <span id="toggle-text">New to PCAux?</span>
       <a id="toggle-link">Create Account</a>
     </div>
   </div>
 </div>
 
-<!-- SUPABASE AUTH SCRIPT - WITH SIGN UP -->
+<!-- SUPABASE AUTH SCRIPT -->
 <script>
 // YOUR SUPABASE CREDENTIALS
 const SUPABASE_URL = 'https://knceschbzidmqvosdwud.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuY2VzY2hiemlkbXF2b3Nkd3VkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NTY2MTgsImV4cCI6MjA4NjUzMjYxOH0.2lZXDSMAQwo4mD5y66-2d6kd6FXMvIFBmNbBgoSx56o';
 
-// CRITICAL FIX: Use correct CDN syntax
 const { createClient } = supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 document.addEventListener('DOMContentLoaded', async function() {
-    // UI Elements
-    const loginBtn = document.getElementById('login-btn');
-    const logoutBtn = document.getElementById('logout-btn');
-    const userInfo = document.getElementById('user-info');
-    const userEmail = document.getElementById('user-email');
-    const modal = document.getElementById('login-modal');
-    const closeModalBtn = document.getElementById('close-modal');
-    const cancelBtn = document.getElementById('cancel-btn');
-    const loginSubmit = document.getElementById('login-submit');
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
-    const errorMessage = document.getElementById('error-message');
-    const successMessage = document.getElementById('success-message');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const modalTitle = document.getElementById('modal-title');
-    const toggleText = document.getElementById('toggle-text');
-    const toggleLink = document.getElementById('toggle-link');
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  const userInfo = document.getElementById('user-info');
+  const userEmail = document.getElementById('user-email');
+  const modal = document.getElementById('login-modal');
+  const closeModalBtn = document.getElementById('close-modal');
+  const cancelBtn = document.getElementById('cancel-btn');
+  const loginSubmit = document.getElementById('login-submit');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const errorMessage = document.getElementById('error-message');
+  const successMessage = document.getElementById('success-message');
+  const loadingSpinner = document.getElementById('loading-spinner');
+  const modalTitle = document.getElementById('modal-title');
+  const toggleText = document.getElementById('toggle-text');
+  const toggleLink = document.getElementById('toggle-link');
+  
+  let authMode = 'signin';
+  
+  // Check existing session
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) showLoggedIn(session.user);
+  
+  // Auth state listener
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      showLoggedIn(session.user);
+      closeModal();
+    } else if (event === 'SIGNED_OUT') {
+      showLoggedOut();
+    }
+  });
+  
+  function showLoggedIn(user) {
+    loginBtn.style.display = 'none';
+    userInfo.classList.add('show');
+    userEmail.textContent = user.email;
+  }
+  
+  function showLoggedOut() {
+    loginBtn.style.display = 'block';
+    userInfo.classList.remove('show');
+    userEmail.textContent = '';
+  }
+  
+  function openModal(e) {
+    if (e) e.preventDefault();
+    resetModal();
+    modal.classList.add('show');
+    document.body.classList.add('modal-open');
+    setTimeout(() => emailInput.focus(), 100);
+  }
+  
+  function closeModal() {
+    modal.classList.remove('show');
+    document.body.classList.remove('modal-open');
+  }
+  
+  function resetModal() {
+    authMode = 'signin';
+    updateModalUI();
+    emailInput.value = '';
+    passwordInput.value = '';
+    hideMessages();
+  }
+  
+  function updateModalUI() {
+    if (authMode === 'signin') {
+      modalTitle.textContent = 'Welcome to PCAux';
+      loginSubmit.textContent = 'Sign In';
+      toggleText.textContent = "New to PCAux?";
+      toggleLink.textContent = 'Create Account';
+    } else {
+      modalTitle.textContent = 'Create Account';
+      loginSubmit.textContent = 'Create Account';
+      toggleText.textContent = 'Already have an account?';
+      toggleLink.textContent = 'Sign In';
+    }
+  }
+  
+  function toggleAuthMode() {
+    authMode = authMode === 'signin' ? 'signup' : 'signin';
+    updateModalUI();
+    hideMessages();
+    emailInput.focus();
+  }
+  
+  function hideMessages() {
+    errorMessage.classList.remove('show');
+    successMessage.classList.remove('show');
+    loadingSpinner.classList.remove('show');
+    loginSubmit.disabled = false;
+  }
+  
+  function showError(msg) {
+    errorMessage.textContent = msg;
+    errorMessage.classList.add('show');
+    loadingSpinner.classList.remove('show');
+    loginSubmit.disabled = false;
+  }
+  
+  function showSuccess(msg) {
+    successMessage.textContent = msg;
+    successMessage.classList.add('show');
+    loadingSpinner.classList.remove('show');
+  }
+  
+  function setLoading(loading) {
+    loginSubmit.disabled = loading;
+    if (loading) {
+      loadingSpinner.classList.add('show');
+      loginSubmit.textContent = authMode === 'signin' ? 'Signing In...' : 'Creating Account...';
+    } else {
+      loadingSpinner.classList.remove('show');
+      updateModalUI();
+    }
+  }
+  
+  async function handleAuth() {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
     
-    // State: 'signin' or 'signup'
-    let authMode = 'signin';
+    hideMessages();
     
-    // Check existing session
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) showLoggedIn(session.user);
-    
-    // Auth state listener
-    supabaseClient.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-            showLoggedIn(session.user);
-            closeModal();
-        } else if (event === 'SIGNED_OUT') {
-            showLoggedOut();
-        }
-    });
-    
-    function showLoggedIn(user) {
-        loginBtn.style.display = 'none';
-        userInfo.classList.add('show');
-        userEmail.textContent = user.email;
+    if (!email || !password) {
+      showError('Please enter both email and password.');
+      return;
     }
     
-    function showLoggedOut() {
-        loginBtn.style.display = 'block';
-        userInfo.classList.remove('show');
-        userEmail.textContent = '';
+    if (password.length < 6) {
+      showError('Password must be at least 6 characters long.');
+      return;
     }
     
-    function openModal(e) {
-        if (e) e.preventDefault();
-        resetModal();
-        modal.classList.add('show');
-        document.body.classList.add('modal-open');
-        setTimeout(() => emailInput.focus(), 100);
-    }
+    setLoading(true);
     
-    function closeModal() {
-        modal.classList.remove('show');
-        document.body.classList.remove('modal-open');
-    }
-    
-    function resetModal() {
-        authMode = 'signin';
-        updateModalUI();
-        emailInput.value = '';
-        passwordInput.value = '';
-        hideMessages();
-    }
-    
-    function updateModalUI() {
-        if (authMode === 'signin') {
-            modalTitle.textContent = 'Sign In to PCAux';
-            loginSubmit.textContent = 'Sign In';
-            toggleText.textContent = "Don't have an account?";
-            toggleLink.textContent = 'Create Account';
-        } else {
-            modalTitle.textContent = 'Create Account';
-            loginSubmit.textContent = 'Create Account';
-            toggleText.textContent = 'Already have an account?';
-            toggleLink.textContent = 'Sign In';
-        }
-    }
-    
-    function toggleAuthMode() {
-        authMode = authMode === 'signin' ? 'signup' : 'signin';
-        updateModalUI();
-        hideMessages();
-        emailInput.focus();
-    }
-    
-    function hideMessages() {
-        errorMessage.classList.remove('show');
-        successMessage.classList.remove('show');
-        loadingSpinner.classList.remove('show');
-    }
-    
-    function showError(msg) {
-        errorMessage.textContent = msg;
-        errorMessage.classList.add('show');
-        successMessage.classList.remove('show');
-        loadingSpinner.classList.remove('show');
-        loginSubmit.disabled = false;
-    }
-    
-    function showSuccess(msg) {
-        successMessage.textContent = msg;
-        successMessage.classList.add('show');
-        errorMessage.classList.remove('show');
-        loadingSpinner.classList.remove('show');
-    }
-    
-    function setLoading(loading) {
-        loginSubmit.disabled = loading;
-        if (loading) {
-            loadingSpinner.classList.add('show');
-            loginSubmit.textContent = authMode === 'signin' ? 'Signing In...' : 'Creating Account...';
-        } else {
-            loadingSpinner.classList.remove('show');
-            updateModalUI();
-        }
-    }
-    
-    async function handleAuth() {
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-        
-        hideMessages();
-        
-        if (!email || !password) {
-            showError('Please enter both email and password.');
-            return;
-        }
-        
-        if (password.length < 6) {
-            showError('Password must be at least 6 characters long.');
-            return;
-        }
-        
-        setLoading(true);
-        
-        try {
-            if (authMode === 'signin') {
-                // SIGN IN
-                const { data, error } = await supabaseClient.auth.signInWithPassword({
-                    email: email,
-                    password: password
-                });
-                
-                if (error) {
-                    showError(error.message === 'Invalid login credentials' 
-                        ? 'Invalid email or password. Please try again.' 
-                        : error.message);
-                } else if (data?.user) {
-                    showSuccess('Welcome back!');
-                    setTimeout(() => {
-                        closeModal();
-                        showLoggedIn(data.user);
-                    }, 800);
-                }
-            } else {
-                // SIGN UP
-                const { data, error } = await supabaseClient.auth.signUp({
-                    email: email,
-                    password: password
-                });
-                
-                if (error) {
-                    showError(error.message);
-                } else if (data?.user) {
-                    // Check if email confirmation is required
-                    if (data.session) {
-                        // Auto-confirmed (email confirmation disabled)
-                        showSuccess('Account created successfully!');
-                        setTimeout(() => {
-                            closeModal();
-                            showLoggedIn(data.user);
-                        }, 800);
-                    } else {
-                        // Email confirmation required
-                        showSuccess('Account created! Please check your email to confirm your account.');
-                        setTimeout(() => {
-                            closeModal();
-                        }, 2000);
-                    }
-                }
-            }
-        } catch (err) {
-            showError('Connection error. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    }
-    
-    async function handleLogout(e) {
-        e.preventDefault();
-        await supabaseClient.auth.signOut();
-        showLoggedOut();
-    }
-    
-    // Event Listeners
-    loginBtn.addEventListener('click', openModal);
-    logoutBtn.addEventListener('click', handleLogout);
-    closeModalBtn.addEventListener('click', closeModal);
-    cancelBtn.addEventListener('click', closeModal);
-    loginSubmit.addEventListener('click', handleAuth);
-    toggleLink.addEventListener('click', toggleAuthMode);
-    
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) closeModal();
-    });
-    
-    [emailInput, passwordInput].forEach(input => {
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleAuth();
+    try {
+      if (authMode === 'signin') {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+          email: email,
+          password: password
         });
-    });
-    
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal.classList.contains('show')) {
+        
+        if (error) {
+          showError(error.message === 'Invalid login credentials' 
+            ? 'Invalid email or password. Please try again.' 
+            : error.message);
+        } else if (data?.user) {
+          showSuccess('Welcome back!');
+          setTimeout(() => {
             closeModal();
+            showLoggedIn(data.user);
+          }, 800);
         }
-    });
-});
-</script>
-
-</body>
-</html>
+      } else {
+        const { data, error } = await supabaseClient.auth.signUp({
+          email: email,
+          password: password
+        });
+        
+        if (error) {
+          showError(error.message);
+        } else if (data?.user) {
+          if (data.session) {
+            showSuccess('Account created successfully!');
+            setTimeout(() => {
+              closeModal();
+              showLoggedIn(data.user);
+            }, 800);
+          } else {
+            showSuccess('Account created! Please check your email to confirm your account.');
+            setTimeout(() => closeModal(), 2000);
+          }
+        }
+      }
+    } catch (err) {
+      showError('Connection error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+  
+  async function handleLogout(e) {
+    e.preventDefault();
+    await supabaseClient.auth.signOut();
+    showLoggedOut();
+  }
+  
+  // Event Listeners
+  loginBtn.addEventListener('click', openModal);
+  logoutBtn.addEventListener
