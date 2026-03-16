@@ -1,19 +1,183 @@
-  <!-- PRODUCT FRAMING -->
-  <section class="product-frame">
-    <div class="frame-header">
-      <div class="frame-title">Live Auction Environment</div>
-      <div class="status">Auction in progress</div>
-    </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PCAux — Competitive Auctions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root {
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #c9a24d;
+  --panel: #111827;
+  --border: rgba(255,255,255,0.08);
+  --shadow: rgba(0,0,0,0.25);
+}
 
-    <div class="auction-grid">
-      <div class="card-panel">
-        <div class="card-image">
-  <video autoplay loop muted playsinline style="width:100%; height:100%; object-fit:cover; border-radius:12px;">
-    <source src="videos/bisapslow.mp4" type="video/mp4">
-  </video>
+/* ===== RESET & WALLPAPER ===== */
+* { box-sizing: border-box; margin:0; padding:0; }
+html, body { width:100%; height:100%; font-family:system-ui,sans-serif; overflow-x:hidden; }
+
+body {
+  background:
+    radial-gradient(1400px 700px at 15% 10%, rgba(90,160,255,0.4), transparent 60%),
+    radial-gradient(1200px 900px at 85% 20%, rgba(255,200,100,0.35), transparent 65%),
+    radial-gradient(1000px 800px at 50% 85%, rgba(120,200,255,0.25), transparent 70%),
+    linear-gradient(180deg, #040812 0%, #0a1228 35%, #020617 100%);
+  background-size:100% 100%;
+  animation: backgroundDrift 25s ease-in-out infinite alternate;
+  position:relative;
+  z-index:0;
+}
+body::before {
+  content:"";
+  position:fixed; inset:0;
+  background:
+    repeating-linear-gradient(130deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 8px),
+    radial-gradient(circle at center, rgba(255,255,255,0.08), transparent 60%);
+  background-size: 300px 300px, 100% 100%;
+  mix-blend-mode: overlay;
+  animation: energyFlow 12s linear infinite;
+  z-index:0;
+  pointer-events:none;
+}
+@keyframes backgroundDrift {
+  0% { background-position: 15% 10%, 85% 20%, 50% 85%, center; }
+  50% { background-position: 18% 15%, 82% 25%, 53% 80%, center; }
+  100% { background-position: 15% 10%, 85% 20%, 50% 85%, center; }
+}
+@keyframes energyFlow {
+  0% { background-position: 0 0, center; }
+  50% { background-position: 300px 300px, center; }
+  100% { background-position: 0 0, center; }
+}
+
+/* ===== CONTAINER & GLOBAL ===== */
+.container { max-width:1200px; margin:0 auto; padding:40px 24px 96px; position:relative; z-index:1; }
+body, h1,h2,h3,p,a { color:var(--text); text-shadow:1px 1px 0 #0a1228,2px 2px 0 rgba(0,0,0,0.25),3px 3px 2px rgba(0,0,0,0.4); }
+a { text-decoration:none; color:inherit; }
+
+/* ===== HEADER ===== */
+.header { display:flex; justify-content:space-between; align-items:center; padding-bottom:24px; border-bottom:1px solid var(--border); }
+.logo { font-weight:700; letter-spacing:0.04em; }
+.nav a { margin-left:20px; font-size:14px; color:var(--muted); }
+.nav a:hover { color:var(--text); }
+
+/* ===== HERO ===== */
+.hero { text-align:center; padding:96px 0 72px; }
+.hero h1 { font-size:44px; line-height:1.15; margin-bottom:16px; }
+.hero p { max-width:640px; margin:0 auto; font-size:18px; color:var(--muted); }
+.accent { color:var(--accent); }
+
+/* ===== 3D FRAMED PANELS ===== */
+.product-frame, .card-panel, .auction-panel, .trust-item {
+  background: linear-gradient(180deg, #0f2040 0%, var(--panel) 100%);
+  border:2px solid var(--accent);
+  border-radius:16px;
+  padding:24px;
+  box-shadow:0 12px 30px rgba(0,0,0,0.8), inset 0 0 8px rgba(255,255,255,0.05);
+  transform: perspective(800px) rotateY(-7deg);
+  transition: transform 0.4s ease, box-shadow 0.3s ease, border-color 0.2s ease;
+}
+.product-frame::before, .card-panel::before, .auction-panel::before, .trust-item::before {
+  content:""; position:absolute; top:-50%; left:-50%; width:200%; height:200%;
+  background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
+  transform: rotate(45deg) translateX(-100%);
+  pointer-events:none;
+  transition: transform 0.6s ease;
+}
+.product-frame:hover, .card-panel:hover, .auction-panel:hover, .trust-item:hover {
+  transform: perspective(800px) rotateY(0deg) scale(1.03);
+  box-shadow:0 20px 35px rgba(0,0,0,0.85);
+  border-color:var(--accent);
+}
+.product-frame:hover::before, .card-panel:hover::before, .auction-panel:hover::before, .trust-item:hover::before {
+  transform: rotate(45deg) translateX(100%);
+}
+
+/* ===== GRID & PANEL LAYOUT ===== */
+.auction-grid { display:grid; grid-template-columns:2fr 1fr; gap:24px; }
+.card-image { height:260px; border-radius:12px; background:linear-gradient(135deg,#1f2937,#020617); display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:14px; margin-bottom:16px; }
+.meta { font-size:14px; color:var(--muted); line-height:1.6; }
+.auction-panel h3 { margin-top:0; margin-bottom:12px; font-size:20px; }
+.auction-panel p { font-size:14px; color:var(--muted); line-height:1.6; }
+.cta { margin-top:24px; padding:14px; text-align:center; border-radius:8px; background: rgba(201,162,77,0.08); border:1px solid rgba(201,162,77,0.25); font-weight:600; color:var(--accent); }
+
+/* ===== TRUST GRID ===== */
+.trust { margin-top:64px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:24px; }
+.trust-item { font-size:14px; color:var(--muted); position:relative; }
+
+/* ===== FOOTER ===== */
+footer { margin-top:96px; padding-top:32px; border-top:1px solid var(--border); font-size:13px; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+
+</style>
+</head>
+
+<body>
+<div class="container">
+
+  <header class="header">
+    <div class="logo">PCAux</div>
+    <nav class="nav">
+      <a href="#">How It Works</a>
+      <a href="#">Auctions</a>
+      <a href="#">Rules</a>
+      <a href="#">Sign In</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>
+      Competitive auctions.<br />
+      <span class="accent">No published prices.</span>
+    </h1>
+    <p>
+      PCAux is a live auction platform for collectible cards.
+      Outcomes are determined by judgment, timing, and competition — nothing else.
+    </p>
+  </section>
+
+ <!-- PRODUCT FRAMING -->
+<section class="product-frame">
+  <div class="frame-header">
+    <div class="frame-title">Live Auction Environment</div>
+    <div class="status">Auction in progress</div>
+  </div>
+
+  <div class="auction-grid">
+    <div class="card-panel">
+      <div class="card-image">
+        <video autoplay loop muted playsinline style="width:100%; height:100%; object-fit:cover; border-radius:12px;">
+          <source src="videos/bisapslow.mp4" type="video/mp4">
+        </video>
+      </div>
+      <div class="meta">
+        Physical collectible card<br />
+        Owned and auctioned by PCAux<br />
+        Grading status may change over time
+      </div>
+    </div>
+  </div>
+</section>
+
+  <!-- TRUST / LEGAL SIGNALS -->
+  <section class="trust">
+    <div class="trust-item">PCAux is the seller of record for all items.</div>
+    <div class="trust-item">Participation grants no ownership until auction close.</div>
+    <div class="trust-item">No pricing, valuation, or investment guidance provided.</div>
+    <div class="trust-item">Governed by Canadian law.</div>
+  </section>
+
+  <footer>
+    <div>© PCAux</div>
+    <div>
+      <a href="#">Legal</a> ·
+      <a href="#">Responsible Play</a> ·
+      <a href="#">Terms</a>
+    </div>
+  </footer>
+
 </div>
-        <div class="meta">
-          Physical collectible card<br />
-          Owned and auctioned by PCAux<br />
-          Grading status may change over time
-        </div>
+</body>
+</html>
+
