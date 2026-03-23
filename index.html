@@ -2,885 +2,1009 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PCAux — Competitive Auctions</title>
+<title>PCAux — Gem Trading</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+/* ============================================
+   YOUR EXISTING CSS - COMPLETELY PRESERVED
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
 :root {
   --text: #e5e7eb;
   --muted: #9ca3af;
-  --accent: #c9a24d;
+  --accent-emerald: #4a9e5a;
+  --accent-sapphire: #3a6ea5;
+  --accent-ruby: #9e4a4a;
   --panel: #111827;
+  --panel-light: #1f2937;
   --border: rgba(255,255,255,0.08);
-  --shadow: rgba(0,0,0,0.25);
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --info: #3b82f6;
 }
 
-/* === DYNAMIC WALLPAPER (Enhanced) === */
-* { box-sizing: border-box; margin:0; padding:0; }
-html, body { width:100%; height:100%; font-family:system-ui,sans-serif; overflow-x:hidden; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { 
+  width: 100%; 
+  min-height: 100%; 
+  font-family: 'Orbitron', sans-serif; 
+  overflow-x: hidden; 
+}
 
 body {
-  background:
-    radial-gradient(1400px 700px at 15% 10%, rgba(90,160,255,0.4), transparent 60%),
-    radial-gradient(1200px 900px at 85% 20%, rgba(255,200,100,0.35), transparent 65%),
-    radial-gradient(1000px 800px at 50% 85%, rgba(120,200,255,0.25), transparent 70%),
-    linear-gradient(180deg, #040812 0%, #0a1228 35%, #020617 100%);
-  background-size: 100% 100%;
+  background: #020617;
   min-height: 100vh;
-  animation: backgroundDrift 25s ease-in-out infinite alternate;
   position: relative;
-  z-index:0;
-  perspective: 1200px;
+  z-index: 0;
 }
 
-body::before {
-  content:"";
-  position: fixed; inset:0;
-  background:
-    repeating-linear-gradient(130deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 8px),
-    radial-gradient(circle at center, rgba(255,255,255,0.08), transparent 60%);
-  background-size: 300px 300px, 100% 100%;
-  mix-blend-mode: overlay;
-  animation: energyFlow 12s linear infinite;
-  z-index:0;
-  pointer-events:none;
+/* ===== GEMSTONE SPARKLES BACKGROUND - PRESERVED ===== */
+.sparkles-container {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-@keyframes backgroundDrift {
-  0% { background-position: 15% 10%, 85% 20%, 50% 85%, center; }
-  50% { background-position: 18% 15%, 82% 25%, 53% 80%, center; }
-  100% { background-position: 15% 10%, 85% 20%, 50% 85%, center; }
+.gem-sparkle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(124,252,0,0.8) 50%, transparent 100%);
+  border-radius: 50%;
+  opacity: 0;
+  animation: sparkleFloat 4s ease-in-out infinite;
+  box-shadow: 0 0 8px currentColor;
 }
 
-@keyframes energyFlow {
-  0% { background-position: 0 0, center; }
-  50% { background-position: 300px 300px, center; }
-  100% { background-position: 0 0, center; }
+@keyframes sparkleFloat {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1) rotate(180deg);
+  }
+  20% {
+    opacity: 0.8;
+    transform: scale(0.8) rotate(360deg);
+  }
+  30% {
+    opacity: 0;
+    transform: scale(0.3) rotate(540deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.2) rotate(720deg);
+  }
 }
 
-/* ===== CONTAINER & GLOBAL ===== */
-.container { max-width:1200px; margin:0 auto; padding:40px 24px 96px; position:relative; z-index:1; }
-body, h1, h2, h3, h4, h5, h6, p, a, span, div {
-  color: var(--text);
-  text-shadow:
-    1px 1px 0 #0a1228,
-    2px 2px 0 rgba(0,0,0,0.25),
-    3px 3px 2px rgba(0,0,0,0.4);
-}
-a { text-decoration:none; color:inherit; }
+/* All sparkle positions preserved exactly */
+.sparkle-1 { top: 8%; left: 15%; animation-delay: 0s; background: #7CFC00; box-shadow: 0 0 12px #7CFC00; }
+.sparkle-2 { top: 20%; left: 85%; animation-delay: 0.8s; background: #ff66cc; box-shadow: 0 0 12px #ff66cc; }
+.sparkle-3 { top: 35%; left: 25%; animation-delay: 1.6s; background: #66ccff; box-shadow: 0 0 12px #66ccff; }
+.sparkle-4 { top: 50%; left: 70%; animation-delay: 2.4s; background: #ffaa44; box-shadow: 0 0 12px #ffaa44; }
+.sparkle-5 { top: 65%; left: 40%; animation-delay: 3.2s; background: #ff66aa; box-shadow: 0 0 12px #ff66aa; }
+.sparkle-6 { top: 80%; left: 60%; animation-delay: 4.0s; background: #44ffaa; box-shadow: 0 0 12px #44ffaa; }
+.sparkle-7 { top: 15%; left: 45%; animation-delay: 4.8s; background: #aa66ff; box-shadow: 0 0 12px #aa66ff; }
+.sparkle-8 { top: 45%; left: 10%; animation-delay: 5.6s; background: #ff9966; box-shadow: 0 0 12px #ff9966; }
+.sparkle-9 { top: 70%; left: 85%; animation-delay: 6.4s; background: #66ff99; box-shadow: 0 0 12px #66ff99; }
+.sparkle-10 { top: 25%; left: 95%; animation-delay: 7.2s; background: #ff66cc; box-shadow: 0 0 12px #ff66cc; }
+.sparkle-11 { top: 55%; left: 55%; animation-delay: 8.0s; background: #7CFC00; box-shadow: 0 0 12px #7CFC00; }
+.sparkle-12 { top: 85%; left: 20%; animation-delay: 8.8s; background: #66ccff; box-shadow: 0 0 12px #66ccff; }
+.sparkle-13 { top: 12%; left: 65%; animation-delay: 9.6s; background: #ffaa44; box-shadow: 0 0 12px #ffaa44; }
+.sparkle-14 { top: 40%; left: 80%; animation-delay: 10.4s; background: #ff66aa; box-shadow: 0 0 12px #ff66aa; }
+.sparkle-15 { top: 60%; left: 15%; animation-delay: 11.2s; background: #44ffaa; box-shadow: 0 0 12px #44ffaa; }
+.sparkle-16 { top: 75%; left: 50%; animation-delay: 12.0s; background: #aa66ff; box-shadow: 0 0 12px #aa66ff; }
+.sparkle-17 { top: 30%; left: 35%; animation-delay: 12.8s; background: #ff9966; box-shadow: 0 0 12px #ff9966; }
+.sparkle-18 { top: 90%; left: 75%; animation-delay: 13.6s; background: #66ff99; box-shadow: 0 0 12px #66ff99; }
+.sparkle-19 { top: 5%; left: 50%; animation-delay: 14.4s; background: #7CFC00; box-shadow: 0 0 12px #7CFC00; }
+.sparkle-20 { top: 50%; left: 90%; animation-delay: 15.2s; background: #ff66cc; box-shadow: 0 0 12px #ff66cc; }
+.sparkle-21 { top: 22%; left: 8%; animation-delay: 16.0s; background: #66ccff; box-shadow: 0 0 12px #66ccff; }
+.sparkle-22 { top: 68%; left: 95%; animation-delay: 16.8s; background: #ffaa44; box-shadow: 0 0 12px #ffaa44; }
+.sparkle-23 { top: 82%; left: 35%; animation-delay: 17.6s; background: #ff66aa; box-shadow: 0 0 12px #ff66aa; }
+.sparkle-24 { top: 10%; left: 78%; animation-delay: 18.4s; background: #44ffaa; box-shadow: 0 0 12px #44ffaa; }
+.sparkle-25 { top: 48%; left: 28%; animation-delay: 19.2s; background: #aa66ff; box-shadow: 0 0 12px #aa66ff; }
 
-/* ===== CORNER 3D PCAUX LOGO (Enhanced) ===== */
-.pcaux-logo-corner {
+/* ===== BACKGROUND WAVES - PRESERVED ===== */
+.bg-waves {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.wave-bg {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  filter: blur(100px);
+  opacity: 0.2;
+  animation: waveBgDrift 24s ease-in-out infinite;
+}
+
+.wave-emerald-bg { background: radial-gradient(circle at 30% 40%, rgba(74, 158, 90, 0.4), transparent 70%); top: -40%; left: -20%; animation-delay: 0s; }
+.wave-sapphire-bg { background: radial-gradient(circle at 50% 50%, rgba(58, 110, 165, 0.4), transparent 70%); top: -30%; left: -10%; animation-delay: 8s; }
+.wave-ruby-bg { background: radial-gradient(circle at 70% 60%, rgba(158, 74, 74, 0.4), transparent 70%); top: -20%; left: 0%; animation-delay: 16s; }
+
+@keyframes waveBgDrift {
+  0% { transform: translate(0px, 0px) scale(1); opacity: 0.15; }
+  50% { transform: translate(40px, -30px) scale(1.05); opacity: 0.25; }
+  100% { transform: translate(-30px, 20px) scale(1); opacity: 0.15; }
+}
+
+/* ===== MAIN CONTAINER ===== */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px 24px 80px;
+  position: relative;
+  z-index: 2;
+}
+
+/* ===== EXACT LOGO FROM YOUR FILE - PRESERVED ===== */
+.gem-logo-corner {
   position: fixed;
   top: 20px;
   left: 20px;
-  display: flex;
-  gap: 6px;
   z-index: 9999;
-  font-family: 'Arial Black', sans-serif;
-  perspective: 1200px;
+  filter: drop-shadow(0 30px 50px rgba(0, 255, 128, 0.6));
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transform: scale(0.35);
+  transform-origin: top left;
+  cursor: pointer;
 }
 
-.pcaux-logo-corner span {
-  font-size: 48px;
+.gem-logo-corner:hover {
+  filter: drop-shadow(0 40px 60px rgba(0, 255, 128, 0.8));
+}
+
+.gem-text {
+  font-size: 160px;
   font-weight: 900;
+  letter-spacing: -0.02em;
+  position: relative;
+  display: flex;
   text-transform: uppercase;
-  background: linear-gradient(270deg, #ff99ff, #66ccff, #ccff66, #ffcc66, #ff66cc);
-  background-size: 800% 800%;
+  line-height: 0.9;
+  font-family: 'Orbitron', sans-serif;
+  transform-style: preserve-3d;
+  gap: 2px;
+}
+
+.gem-letter {
+  display: inline-block;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: letterFloat 6s ease-in-out infinite;
+  filter: brightness(1.2);
+}
+
+.gem-letter:nth-child(1) { animation-delay: 0s; }
+.gem-letter:nth-child(2) { animation-delay: 0.2s; }
+.gem-letter:nth-child(3) { animation-delay: 0.4s; }
+.gem-letter:nth-child(4) { animation-delay: 0.6s; }
+.gem-letter:nth-child(5) { animation-delay: 0.8s; }
+
+@keyframes letterFloat {
+  0%, 100% { transform: translateY(0px) rotateX(2deg) rotateY(2deg); }
+  50% { transform: translateY(-8px) rotateX(5deg) rotateY(5deg); }
+}
+
+.gem-letter::before {
+  content: attr(data-letter);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    145deg,
+    #7CFC00 0%,
+    #00FA9A 15%,
+    #2E8B57 30%,
+    #228B22 45%,
+    #006400 60%,
+    #0A5C2E 75%,
+    #013220 90%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow:
-    1px 1px 0 rgba(0,0,0,0.12),
-    2px 2px 0 rgba(0,0,0,0.08),
-    3px 3px 2px rgba(0,0,0,0.06),
-    0 0 6px rgba(255,255,255,0.1);
-  transform-style: preserve-3d;
-  animation: floatLogoZ 6s ease-in-out infinite alternate, gradientShift 20s ease infinite;
-  transition: transform 0.5s ease;
+  background-clip: text;
+  text-shadow: 
+    0 0 20px rgba(124,252,0,0.5),
+    2px 2px 4px rgba(0,0,0,0.3);
+  transform: translateZ(2px);
 }
 
-.pcaux-logo-corner span:hover {
-  transform: translateZ(40px) rotateY(20deg) scale(1.15);
+.gem-letter[data-letter="P"]::before,
+.gem-letter[data-letter="X"]::before {
+  background: linear-gradient(
+    145deg,
+    #050f22 0%,
+    #0b1f4a 15%,
+    #123a7a 30%,
+    #1a4fb0 45%,
+    #2a66e0 60%,
+    #1a4fb0 75%,
+    #0b1f4a 90%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 
+    0 0 18px rgba(60,120,255,0.35),
+    2px 2px 4px rgba(0,0,0,0.3);
 }
 
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+.gem-letter[data-letter="A"]::before {
+  background: linear-gradient(
+    145deg,
+    #2a0000 0%,
+    #4a0000 15%,
+    #7a0b0b 30%,
+    #a61a1a 45%,
+    #d92b2b 60%,
+    #a61a1a 75%,
+    #4a0000 90%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 
+    0 0 18px rgba(255,60,60,0.35),
+    2px 2px 4px rgba(0,0,0,0.3);
 }
 
-@keyframes floatLogoZ {
-  0% { transform: translateZ(0px); }
-  25% { transform: translateZ(15px); }
-  50% { transform: translateZ(30px); }
-  75% { transform: translateZ(15px); }
-  100% { transform: translateZ(0px); }
+.gem-letter .edge-top {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 100%;
+  height: 20%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.6) 0%, transparent 100%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  z-index: 5;
 }
 
-/* ===== HEADER (Enhanced) ===== */
+.gem-letter .edge-right {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 10%;
+  height: 100%;
+  background: linear-gradient(270deg, rgba(255,255,255,0.5) 0%, transparent 100%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.gem-letter .edge-bottom {
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 20%;
+  background: linear-gradient(0deg, rgba(0,50,0,0.4) 0%, transparent 100%);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.gem-letter .edge-left {
+  position: absolute;
+  top: 0;
+  left: -2px;
+  width: 10%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0,50,0,0.3) 0%, transparent 100%);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.light-source {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 30% 30%, 
+    rgba(255,255,255,0.2) 0%, 
+    rgba(124,252,0,0.1) 30%,
+    transparent 70%);
+  animation: rotateLight 15s linear infinite;
+  pointer-events: none;
+  z-index: 10;
+  mix-blend-mode: overlay;
+}
+
+@keyframes rotateLight {
+  0% { transform: rotate(0deg) scale(1); opacity: 0.3; }
+  50% { transform: rotate(180deg) scale(1.2); opacity: 0.6; }
+  100% { transform: rotate(360deg) scale(1); opacity: 0.3; }
+}
+
+.logo-sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 
+    0 0 15px 3px white,
+    0 0 25px 6px #7CFC00;
+  animation: sparkleFlash 4s ease-in-out infinite;
+  opacity: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+@keyframes sparkleFlash {
+  0% { opacity: 0; transform: scale(0.5); }
+  10% { opacity: 1; transform: scale(1.2); }
+  20% { opacity: 0.6; transform: scale(0.9); }
+  30% { opacity: 1; transform: scale(1.1); }
+  40% { opacity: 0; transform: scale(0.5); }
+  100% { opacity: 0; transform: scale(0.5); }
+}
+
+.logo-sparkle-1 { top: 15%; left: 12%; animation-delay: 0s; }
+.logo-sparkle-2 { top: 25%; left: 28%; animation-delay: 0.7s; }
+.logo-sparkle-3 { top: 70%; left: 22%; animation-delay: 1.4s; }
+.logo-sparkle-4 { top: 35%; left: 48%; animation-delay: 2.1s; }
+.logo-sparkle-5 { top: 80%; left: 42%; animation-delay: 2.8s; }
+.logo-sparkle-6 { top: 20%; left: 68%; animation-delay: 3.5s; }
+.logo-sparkle-7 { top: 55%; left: 78%; animation-delay: 4.2s; }
+.logo-sparkle-8 { top: 75%; left: 88%; animation-delay: 4.9s; }
+.logo-sparkle-9 { top: 45%; left: 15%; animation-delay: 5.6s; }
+.logo-sparkle-10 { top: 65%; left: 58%; animation-delay: 6.3s; }
+
+.depth-shadow {
+  position: absolute;
+  bottom: -30px;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background: radial-gradient(ellipse at center, rgba(0,255,128,0.3) 0%, transparent 80%);
+  filter: blur(20px);
+  z-index: -1;
+}
+
+/* ===== HEADER - PRESERVED ===== */
 .header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  padding: 24px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.logo {
-  display: none; /* Hide old logo since we have the corner logo */
+  padding: 20px 0 40px;
 }
 
 .nav {
   display: flex;
   gap: 12px;
-  margin-left: auto;
 }
 
-.nav a {
-  margin-left: 0;
+.nav a, .nav button {
   font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border: 2px solid #4a9e5a;
+  border-radius: 8px;
+  background: rgba(15, 32, 64, 0.7);
+  backdrop-filter: blur(4px);
   color: var(--text);
   text-decoration: none;
-  padding: 6px 12px;
-  border: 2px solid var(--accent);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
   transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  background: #0f2040;
-}
-
-.nav a::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
-  transform: rotate(45deg) translateX(-100%);
-  pointer-events: none;
-  transition: transform 0.6s ease;
-}
-
-.nav a:hover::before {
-  transform: rotate(45deg) translateX(100%);
-}
-
-.nav a:hover {
-  transform: scale(1.05);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
-}
-
-.user-info {
-  display: none;
-  align-items: center;
-  gap: 10px;
-  color: var(--accent);
-}
-
-.user-info.show {
-  display: flex;
-}
-
-.user-info span {
-  padding: 6px 12px;
-  background: #0f2040;
-  border: 2px solid var(--accent);
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.user-info a {
-  margin-left: 0;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  padding: 6px;
-}
-
-.user-info a:hover {
-  transform: none;
-  box-shadow: none;
-  color: var(--accent);
-}
-
-/* ===== HERO ===== */
-.hero { text-align:center; padding:96px 0 72px; }
-.hero h1 { font-size:44px; line-height:1.15; margin-bottom:16px; }
-.hero p { max-width:640px; margin:0 auto; font-size:18px; color:var(--muted); }
-.accent { color:var(--accent); }
-
-/* ===== 3D FRAMED PANELS (Enhanced) ===== */
-.product-frame, .card-panel, .auction-panel, .trust-item {
-  background: linear-gradient(180deg, #0f2040 0%, var(--panel) 100%);
-  border: 2px solid var(--accent);
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.8);
-  transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.2s ease;
-  position: relative;
-  overflow: hidden;
-  transform: perspective(800px) rotateY(-7deg);
-}
-
-.product-frame::before, .card-panel::before, .auction-panel::before, .trust-item::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
-  transform: rotate(45deg) translateX(-100%);
-  pointer-events: none;
-  transition: transform 0.7s ease;
-}
-
-.product-frame:hover, .card-panel:hover, .auction-panel:hover, .trust-item:hover {
-  transform: perspective(800px) rotateY(0deg) scale(1.05);
-  box-shadow: 0 25px 45px rgba(0,0,0,0.9), inset 0 0 12px rgba(255,255,255,0.08);
-  border-color: var(--accent);
-}
-
-.product-frame:hover::before, .card-panel:hover::before, .auction-panel:hover::before, .trust-item:hover::before {
-  transform: rotate(45deg) translateX(100%);
-}
-
-/* ===== GRID & PANEL LAYOUT ===== */
-.auction-grid { display:grid; grid-template-columns:2fr 1fr; gap:24px; }
-.card-image { height:260px; border-radius:12px; background:linear-gradient(135deg,#1f2937,#020617); display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:14px; margin-bottom:16px; }
-.meta { font-size:14px; color:var(--muted); line-height:1.6; }
-.auction-panel h3 { margin-top:0; margin-bottom:12px; font-size:20px; }
-.auction-panel p { font-size:14px; color:var(--muted); line-height:1.6; }
-
-/* ===== CTA BUTTON (Enhanced) ===== */
-.cta {
-  margin-top: 24px;
-  padding: 14px;
-  text-align: center;
-  border-radius: 8px;
-  background: #0f2040;
-  border: 2px solid var(--accent);
-  font-weight: 600;
-  color: var(--text);
+  font-family: 'Orbitron', sans-serif;
   cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
+}
+
+.nav a:hover, .nav button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  border-color: #fff;
+}
+
+.user-info { display: none; align-items: center; gap: 10px; }
+.user-info.show { display: flex; }
+
+/* ===== THREE GEM CARDS - PRESERVED ===== */
+.gem-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+  margin: 40px 0 60px;
+}
+
+.gem-card {
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  background: linear-gradient(145deg, rgba(15, 32, 64, 0.8) 0%, rgba(2, 6, 23, 0.95) 100%);
+  backdrop-filter: blur(4px);
+  transition: all 0.4s ease;
+  border-width: 2px;
+  border-style: solid;
+  position: relative;
 }
 
-.cta::before {
-  content: "";
+.gem-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 30px 50px rgba(0,0,0,0.6);
+}
+
+.card-emerald { border-color: #4a9e5a; }
+.card-sapphire { border-color: #3a6ea5; }
+.card-ruby { border-color: #9e4a4a; }
+
+/* DYNAMIC WAVE IN THE BACKGROUND OF THE CARD - PRESERVED */
+.card-wave {
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(120deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.05) 100%);
-  transform: rotate(45deg) translateX(-100%);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
   pointer-events: none;
-  transition: transform 0.6s ease;
+  border-radius: 20px;
+  opacity: 0.5;
 }
 
-.cta:hover::before {
-  transform: rotate(45deg) translateX(100%);
+.card-emerald .card-wave {
+  background: repeating-linear-gradient(45deg, 
+    rgba(0, 255, 0, 0.2) 0px,
+    rgba(0, 255, 0, 0.2) 40px,
+    rgba(0, 200, 0, 0.3) 40px,
+    rgba(0, 200, 0, 0.3) 80px,
+    rgba(50, 255, 50, 0.4) 80px,
+    rgba(50, 255, 50, 0.4) 120px);
+  background-size: 200% 200%;
+  animation: waveFlow 3s linear infinite;
 }
 
-.cta:hover {
-  transform: scale(1.05) translateY(-2px);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+.card-sapphire .card-wave {
+  background: repeating-linear-gradient(45deg, 
+    rgba(0, 100, 255, 0.2) 0px,
+    rgba(0, 100, 255, 0.2) 40px,
+    rgba(0, 150, 255, 0.3) 40px,
+    rgba(0, 150, 255, 0.3) 80px,
+    rgba(100, 150, 255, 0.4) 80px,
+    rgba(100, 150, 255, 0.4) 120px);
+  background-size: 200% 200%;
+  animation: waveFlow 3s linear infinite;
 }
 
-/* ===== TRUST GRID ===== */
-.trust { margin-top:64px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:24px; }
+.card-ruby .card-wave {
+  background: repeating-linear-gradient(45deg, 
+    rgba(255, 0, 0, 0.2) 0px,
+    rgba(255, 0, 0, 0.2) 40px,
+    rgba(255, 50, 50, 0.3) 40px,
+    rgba(255, 50, 50, 0.3) 80px,
+    rgba(255, 100, 100, 0.4) 80px,
+    rgba(255, 100, 100, 0.4) 120px);
+  background-size: 200% 200%;
+  animation: waveFlow 3s linear infinite;
+}
 
-/* ===== FOOTER (Enhanced) ===== */
-footer {
-  margin-top: 96px;
-  padding: 32px 0;
-  border-top: 1px solid var(--border);
-  font-size: 13px;
+@keyframes waveFlow {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 100% 100%; }
+}
+
+.preview-area {
+  position: relative;
+  width: 100%;
+  padding: 20px;
+  z-index: 1;
+}
+
+.video-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  background: #000;
+}
+
+.gem-video {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.video-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f1a2a, #030712);
+  border-radius: 16px;
+}
+
+.fallback-gem {
+  font-size: 60px;
+  animation: fallbackSpin 6s ease-in-out infinite;
+}
+
+.fallback-text {
+  margin-top: 12px;
+  font-size: 12px;
   color: var(--muted);
+}
+
+@keyframes fallbackSpin {
+  0% { transform: rotate(0deg) scale(1); opacity: 0.6; }
+  50% { transform: rotate(180deg) scale(1.1); opacity: 1; }
+  100% { transform: rotate(360deg) scale(1); opacity: 0.6; }
+}
+
+.card-info {
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+  background: rgba(2, 6, 23, 0.6);
+}
+
+.ticker {
+  background: rgba(0,0,0,0.5);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.ticker-symbol {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.ticker-price {
+  font-size: 28px;
+  font-weight: 800;
+  color: white;
+}
+
+.ticker-change {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.change-positive { color: #4a9e5a; }
+.change-negative { color: #9e4a4a; }
+
+.trading-status {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.trading-now {
+  display: inline-block;
+  border-radius: 30px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.card-emerald .trading-now { border: 1px solid #4a9e5a; color: #4a9e5a; background: rgba(74, 158, 90, 0.15); }
+.card-sapphire .trading-now { border: 1px solid #3a6ea5; color: #3a6ea5; background: rgba(58, 110, 165, 0.15); }
+.card-ruby .trading-now { border: 1px solid #9e4a4a; color: #9e4a4a; background: rgba(158, 74, 74, 0.15); }
+
+.gem-specs {
+  text-align: center;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.carat {
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.no-enhance {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+
+.trust {
+  margin-top: 60px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.trust-item {
+  padding: 20px;
+  border: 1px solid rgba(74, 158, 90, 0.3);
+  border-radius: 12px;
+  background: rgba(15, 32, 64, 0.5);
+  backdrop-filter: blur(4px);
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+footer {
+  margin-top: 80px;
+  padding: 30px 0 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 footer a {
   color: var(--muted);
   text-decoration: none;
-  transition: color 0.3s ease;
 }
 
 footer a:hover {
-  color: #fff;
+  color: #4a9e5a;
 }
 
-/* ===== MODAL STYLES (Enhanced) ===== */
-.modal {
+/* ============================================
+   NEW: TRADING DASHBOARD STYLES (ADDED BELOW)
+   Matching your aesthetic exactly
+   ============================================ */
+
+/* Page visibility */
+.page {
   display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.85);
-  z-index: 99999;
-  justify-content: center;
-  align-items: center;
-  backdrop-filter: blur(8px);
+  animation: fadeIn 0.4s ease;
 }
 
-.modal.show {
-  display: flex !important;
+.page.active {
+  display: block;
 }
 
-.modal-content {
-  background: linear-gradient(180deg, #1a2639 0%, #0f1420 100%);
-  border: 2px solid var(--accent);
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Dashboard Layout */
+.dashboard-container {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 30px;
+  margin-top: 40px;
+  min-height: 70vh;
+}
+
+/* Sidebar Navigation - Matching your gem theme */
+.sidebar-nav {
+  background: rgba(15, 32, 64, 0.6);
+  border: 1px solid rgba(74, 158, 90, 0.3);
   border-radius: 16px;
-  padding: 32px;
-  max-width: 400px;
-  width: 90%;
-  position: relative;
-  box-shadow: 0 25px 50px rgba(0,0,0,0.8);
-  animation: modalSlideIn 0.3s ease;
-  transform: none !important;
+  padding: 24px;
+  height: fit-content;
+  backdrop-filter: blur(10px);
 }
 
-@keyframes modalSlideIn {
-  from { transform: translateY(-50px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.modal h2 {
-  color: var(--accent);
+.sidebar-section {
   margin-bottom: 24px;
-  font-size: 24px;
-  text-align: center;
-  text-shadow: none;
 }
 
-.form-group {
+.sidebar-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-bottom: 12px;
+  padding-left: 12px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: var(--text);
+  border: 1px solid transparent;
+}
+
+.nav-item:hover, .nav-item.active {
+  background: rgba(74, 158, 90, 0.15);
+  border-color: rgba(74, 158, 90, 0.5);
+  color: #4a9e5a;
+  transform: translateX(4px);
+}
+
+.nav-icon {
+  font-size: 18px;
+}
+
+/* Main Content Area */
+.main-content {
+  background: rgba(15, 32, 64, 0.4);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 30px;
+  backdrop-filter: blur(10px);
+}
+
+/* Stats Grid - Matching your card style */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(74, 158, 90, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  border-color: #4a9e5a;
+  box-shadow: 0 8px 24px rgba(74, 158, 90, 0.15);
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: white;
+}
+
+.stat-value.positive { color: var(--success); text-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
+.stat-value.negative { color: var(--danger); text-shadow: 0 0 10px rgba(239, 68, 68, 0.3); }
+
+/* Content Cards */
+.content-card {
+  background: rgba(2, 6, 23, 0.5);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-size: 14px;
-  text-shadow: none;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 14px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 16px;
-  transition: all 0.3s ease;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(201, 162, 77, 0.2);
-}
-
-.modal-buttons {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-.modal-buttons button {
-  flex: 1;
-  padding: 14px;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
+.card-title {
+  font-size: 18px;
   font-weight: 600;
+  color: #4a9e5a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.data-table td {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 14px;
+}
+
+.data-table tr:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-buy {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-sell {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s ease;
+  font-family: 'Orbitron', sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #4a9e5a, #3d8b4d);
+  color: white;
+  border: 1px solid #4a9e5a;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(74, 158, 90, 0.3);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.btn-secondary {
+  background: rgba(255,255,255,0.1);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* Bot Panel - Matching your aesthetic */
+.bot-panel {
+  background: linear-gradient(145deg, rgba(15, 32, 64, 0.9), rgba(2, 6, 23, 0.95));
+  border: 1px solid rgba(74, 158, 90, 0.5);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+.bot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.bot-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #4a9e5a;
+}
+
+.bot-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.bot-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bot-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bot-input, .bot-select {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(74, 158, 90, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+}
+
+.bot-input:focus, .bot-select:focus {
+  outline: none;
+  border-color: #4a9e5a;
+  box-shadow: 0 0 0 3px rgba(74, 158, 90, 0.1);
+}
+
+/* Arena Grid */
+.arena-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.arena-card {
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(74, 158, 90, 0.3);
+  border-radius: 16px;
+  padding: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 }
 
-.btn-primary {
-  background: var(--accent);
-  color: #000;
-  border: 2px solid var(--accent);
+.arena-card:hover {
+  transform: translateY(-4px);
+  border-color: #4a9e5a;
+  box-shadow: 0 12px 30px rgba(74, 158, 90, 0.2);
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: #dbb45c;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(201, 162, 77, 0.3);
+.arena-card.selected {
+  border-color: #4a9e5a;
+  box-shadow: 0 0 0 2px #4a9e5a, 0 12px 30px rgba(74, 158, 90, 0.3);
 }
 
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #0f2040;
-  border: 2px solid var(--accent);
-  color: var(--text);
-}
-
-.btn-secondary:hover {
-  transform: scale(1.05);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.6);
-}
-
-.close-modal {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  color: var(--muted);
-  font-size: 28px;
-  cursor: pointer;
-  transition: color 0.3s ease;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.close-modal:hover {
-  color: var(--accent);
-  background: rgba(255,255,255,0.1);
-}
-
-.error-message {
-  color: #ff6b6b;
-  font-size: 14px;
-  margin-top: 8px;
-  display: none;
+.gem-icon {
+  font-size: 48px;
   text-align: center;
-  padding: 8px;
-  background: rgba(255, 107, 107, 0.1);
-  border-radius: 6px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
 }
 
-.error-message.show {
-  display: block;
-}
-
-.success-message {
-  color: #51cf66;
-  font-size: 14px;
-  margin-top: 8px;
-  display: none;
-  text-align: center;
-  padding: 8px;
-  background: rgba(81, 207, 102, 0.1);
-  border-radius: 6px;
-}
-
-.success-message.show {
-  display: block;
-}
-
-.loading-spinner {
-  display: none;
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(201, 162, 77, 0.3);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto;
-}
-
-.loading-spinner.show {
-  display: block;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-body.modal-open {
-  overflow: hidden;
-}
-
-.auth-toggle {
-  text-align: center;
-  margin-top: 20px;
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.auth-toggle a {
-  color: var(--accent);
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.auth-toggle a:hover {
-  color: #dbb45c;
-}
-</style>
-</head>
-
-<body>
-<!-- Corner 3D PCAUX Logo (Added) -->
-<div class="pcaux-logo-corner">
-  <span>P</span>
-  <span>C</span>
-  <span>A</span>
-  <span>U</span>
-  <span>X</span>
-</div>
-
-<div class="container">
-
-  <header class="header">
-    <div class="logo">PCAux</div> <!-- Hidden but kept for structure -->
-    <nav class="nav">
-      <a href="#">How It Works</a>
-      <a href="#">Auctions</a>
-      <a href="#">Rules</a>
-      <a href="#" id="login-btn">Sign In</a>
-      <div class="user-info" id="user-info">
-        <span id="user-email"></span>
-        <a href="#" id="logout-btn" style="color: var(--muted);">(Logout)</a>
-      </div>
-    </nav>
-  </header>
-
-  <section class="hero">
-    <h1>
-      Competitive auctions.<br />
-      <span class="accent">No published prices.</span>
-    </h1>
-    <p>
-      PCAux is a live auction platform for collectible cards.
-      Outcomes are determined by judgment, timing, and competition — nothing else.
-    </p>
-  </section>
-
- <!-- PRODUCT FRAMING -->
-<section class="product-frame">
-  <div class="frame-header">
-    <div class="frame-title">Live Auction Environment</div>
-    <div class="status">Auction in progress</div>
-  </div>
-
-  <div class="auction-grid">
-    <div class="card-panel">
-      <div class="card-image">
-        <video autoplay loop muted playsinline style="width:100%; height:100%; object-fit:cover; border-radius:12px;">
-          <source src="videos/bisapslow.mp4" type="video/mp4">
-        </video>
-      </div>
-      <div class="meta">
-        Physical collectible card<br />
-        Owned and auctioned by PCAux<br />
-        Grading status may change over time
-      </div>
-    </div>
-  </div>
-</section>
-
-  <!-- TRUST / LEGAL SIGNALS -->
-  <section class="trust">
-    <div class="trust-item">PCAux is the seller of record for all items.</div>
-    <div class="trust-item">Participation grants no ownership until auction close.</div>
-    <div class="trust-item">No pricing, valuation, or investment guidance provided.</div>
-    <div class="trust-item">Governed by Canadian law.</div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer>
-    <div>© PCAux</div>
-    <div>
-      <a href="#">Legal</a> ·
-      <a href="#">Responsible Play</a> ·
-      <a href="#">Terms</a>
-    </div>
-  </footer>
-
-</div>
-
-<!-- LOGIN MODAL -->
-<div class="modal" id="login-modal">
-  <div class="modal-content">
-    <span class="close-modal" id="close-modal">&times;</span>
-    <h2 id="modal-title">Sign In to PCAux</h2>
-    
-    <div class="form-group">
-      <label for="email">Email</label>
-      <input type="email" id="email" placeholder="your@email.com" autocomplete="email">
-    </div>
-    
-    <div class="form-group">
-      <label for="password">Password</label>
-      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    
-    <div class="error-message" id="error-message"></div>
-    <div class="success-message" id="success-message"></div>
-    <div class="loading-spinner" id="loading-spinner"></div>
-    
-    <div class="modal-buttons">
-      <button class="btn-secondary" id="cancel-btn">Cancel</button>
-      <button class="btn-primary" id="login-submit">Sign In</button>
-    </div>
-    
-    <div class="auth-toggle">
-      <span id="toggle-text">Don't have an account?</span>
-      <a id="toggle-link">Create Account</a>
-    </div>
-  </div>
-</div>
-
-<!-- SUPABASE AUTH SCRIPT - WITH SIGN UP -->
-<script>
-// YOUR SUPABASE CREDENTIALS
-const SUPABASE_URL = 'https://knceschbzidmqvosdwud.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuY2VzY2hiemlkbXF2b3Nkd3VkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NTY2MTgsImV4cCI6MjA4NjUzMjYxOH0.2lZXDSMAQwo4mD5y66-2d6kd6FXMvIFBmNbBgoSx56o';
-
-// CRITICAL FIX: Use correct CDN syntax
-const { createClient } = supabase;
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-document.addEventListener('DOMContentLoaded', async function() {
-    // UI Elements
-    const loginBtn = document.getElementById('login-btn');
-    const logoutBtn = document.getElementById('logout-btn');
-    const userInfo = document.getElementById('user-info');
-    const userEmail = document.getElementById('user-email');
-    const modal = document.getElementById('login-modal');
-    const closeModalBtn = document.getElementById('close-modal');
-    const cancelBtn = document.getElementById('cancel-btn');
-    const loginSubmit = document.getElementById('login-submit');
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
-    const errorMessage = document.getElementById('error-message');
-    const successMessage = document.getElementById('success-message');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const modalTitle = document.getElementById('modal-title');
-    const toggleText = document.getElementById('toggle-text');
-    const toggleLink = document.getElementById('toggle-link');
-    
-    // State: 'signin' or 'signup'
-    let authMode = 'signin';
-    
-    // Check existing session
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) showLoggedIn(session.user);
-    
-    // Auth state listener
-    supabaseClient.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-            showLoggedIn(session.user);
-            closeModal();
-        } else if (event === 'SIGNED_OUT') {
-            showLoggedOut();
-        }
-    });
-    
-    function showLoggedIn(user) {
-        loginBtn.style.display = 'none';
-        userInfo.classList.add('show');
-        userEmail.textContent = user.email;
-    }
-    
-    function showLoggedOut() {
-        loginBtn.style.display = 'block';
-        userInfo.classList.remove('show');
-        userEmail.textContent = '';
-    }
-    
-    function openModal(e) {
-        if (e) e.preventDefault();
-        resetModal();
-        modal.classList.add('show');
-        document.body.classList.add('modal-open');
-        setTimeout(() => emailInput.focus(), 100);
-    }
-    
-    function closeModal() {
-        modal.classList.remove('show');
-        document.body.classList.remove('modal-open');
-    }
-    
-    function resetModal() {
-        authMode = 'signin';
-        updateModalUI();
-        emailInput.value = '';
-        passwordInput.value = '';
-        hideMessages();
-    }
-    
-    function updateModalUI() {
-        if (authMode === 'signin') {
-            modalTitle.textContent = 'Sign In to PCAux';
-            loginSubmit.textContent = 'Sign In';
-            toggleText.textContent = "Don't have an account?";
-            toggleLink.textContent = 'Create Account';
-        } else {
-            modalTitle.textContent = 'Create Account';
-            loginSubmit.textContent = 'Create Account';
-            toggleText.textContent = 'Already have an account?';
-            toggleLink.textContent = 'Sign In';
-        }
-    }
-    
-    function toggleAuthMode() {
-        authMode = authMode === 'signin' ? 'signup' : 'signin';
-        updateModalUI();
-        hideMessages();
-        emailInput.focus();
-    }
-    
-    function hideMessages() {
-        errorMessage.classList.remove('show');
-        successMessage.classList.remove('show');
-        loadingSpinner.classList.remove('show');
-    }
-    
-    function showError(msg) {
-        errorMessage.textContent = msg;
-        errorMessage.classList.add('show');
-        successMessage.classList.remove('show');
-        loadingSpinner.classList.remove('show');
-        loginSubmit.disabled = false;
-    }
-    
-    function showSuccess(msg) {
-        successMessage.textContent = msg;
-        successMessage.classList.add('show');
-        errorMessage.classList.remove('show');
-        loadingSpinner.classList.remove('show');
-    }
-    
-    function setLoading(loading) {
-        loginSubmit.disabled = loading;
-        if (loading) {
-            loadingSpinner.classList.add('show');
-            loginSubmit.textContent = authMode === 'signin' ? 'Signing In...' : 'Creating Account...';
-        } else {
-            loadingSpinner.classList.remove('show');
-            updateModalUI();
-        }
-    }
-    
-    async function handleAuth() {
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-        
-        hideMessages();
-        
-        if (!email || !password) {
-            showError('Please enter both email and password.');
-            return;
-        }
-        
-        if (password.length < 6) {
-            showError('Password must be at least 6 characters long.');
-            return;
-        }
-        
-        setLoading(true);
-        
-        try {
-            if (authMode === 'signin') {
-                // SIGN IN
-                const { data, error } = await supabaseClient.auth.signInWithPassword({
-                    email: email,
-                    password: password
-                });
-                
-                if (error) {
-                    showError(error.message === 'Invalid login credentials' 
-                        ? 'Invalid email or password. Please try again.' 
-                        : error.message);
-                } else if (data?.user) {
-                    showSuccess('Welcome back!');
-                    setTimeout(() => {
-                        closeModal();
-                        showLoggedIn(data.user);
-                    }, 800);
-                }
-            } else {
-                // SIGN UP
-                const { data, error } = await supabaseClient.auth.signUp({
-                    email: email,
-                    password: password
-                });
-                
-                if (error) {
-                    showError(error.message);
-                } else if (data?.user) {
-                    // Check if email confirmation is required
-                    if (data.session) {
-                        // Auto-confirmed (email confirmation disabled)
-                        showSuccess('Account created successfully!');
-                        setTimeout(() => {
-                            closeModal();
-                            showLoggedIn(data.user);
-                        }, 800);
-                    } else {
-                        // Email confirmation required
-                        showSuccess('Account created! Please check your email to confirm your account.');
-                        setTimeout(() => {
-                            closeModal();
-                        }, 2000);
-                    }
-                }
-            }
-        } catch (err) {
-            showError('Connection error. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    }
-    
-    async function handleLogout(e) {
-        e.preventDefault();
-        await supabaseClient.auth.signOut();
-        showLoggedOut();
-    }
-    
-    // Event Listeners
-    loginBtn.addEventListener('click', openModal);
-    logoutBtn.addEventListener('click', handleLogout);
-    closeModalBtn.addEventListener('click', closeModal);
-    cancelBtn.addEventListener('click', closeModal);
-    loginSubmit.addEventListener('click', handleAuth);
-    toggleLink.addEventListener('click', toggleAuthMode);
-    
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) closeModal();
-    });
-    
-    [emailInput, passwordInput].forEach(input => {
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleAuth();
-        });
-    });
-    
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal.classList.contains('show')) {
-            closeModal();
-        }
-    });
-});
-</script>
-
-</body>
-</html>
+.arena-gem-name {
+  font-size: 16p
 
